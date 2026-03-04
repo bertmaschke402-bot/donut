@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>❄ DonutSMP Market Dashboard v3</title>
+<title>❄ DonutSMP Market Dashboard v4</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/luxon"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
@@ -11,7 +11,6 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  margin: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, #0a0f1e 0%, #1a1f2f 100%);
   color: #fff;
@@ -208,10 +207,21 @@ th {
 td {
   padding: 12px 10px;
   border-bottom: 1px solid rgba(255,255,255,0.03);
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
 tr:hover td {
-  background: rgba(255,255,255,0.02);
+  background: rgba(255,255,255,0.05);
+}
+
+.item-icon {
+  width: 32px;
+  height: 32px;
+  vertical-align: middle;
+  margin-right: 10px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 5px rgba(255,255,255,0.3));
 }
 
 .green { color: #00ff88; font-weight: bold; text-shadow: 0 0 10px #00ff8844; }
@@ -339,18 +349,115 @@ canvas {
   font-size: 1.2rem;
 }
 
+/* Modal */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.8);
+  backdrop-filter: blur(10px);
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: rgba(20,25,40,0.95);
+  border-radius: 30px;
+  padding: 30px;
+  width: 90%;
+  max-width: 1000px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  position: relative;
+}
+
+.close {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  color: #aaa;
+  font-size: 40px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.close:hover {
+  color: white;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: 20px;
+}
+
+.modal-header img {
+  width: 64px;
+  height: 64px;
+  image-rendering: pixelated;
+}
+
+.modal-header h2 {
+  font-size: 2rem;
+  color: #aaccff;
+}
+
+.modal-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  margin-bottom: 30px;
+  background: rgba(255,255,255,0.03);
+  padding: 20px;
+  border-radius: 20px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  opacity: 0.7;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.modal-chart {
+  margin-top: 20px;
+}
+
+#modalChart {
+  max-height: 400px;
+}
+
 @media (max-width: 768px) {
   .chart-grid { grid-template-columns: 1fr; }
   h1 { font-size: 1.8rem; }
   .card div { font-size: 1.3rem; }
   .search-box { width: 100%; }
+  .modal-header { flex-direction: column; text-align: center; }
 }
 </style>
 </head>
 <body>
 <canvas id="backgroundCanvas"></canvas>
 
-<h1>❄ DonutSMP Market Dashboard v3</h1>
+<h1>❄ DonutSMP Market Dashboard v4</h1>
 
 <div class="container">
   <div class="controls">
@@ -367,28 +474,28 @@ canvas {
   <!-- Top Cards -->
   <div class="cards">
     <div class="card" id="spikeCard">
-      <h3>🔥 Top Gain (1h)</h3>
+      <h3>🔥 Top Gain (24h)</h3>
       <div id="spike">-</div>
       <small>Bester Anstieg</small>
     </div>
     <div class="card" id="crashCard">
-      <h3>📉 Top Loss (1h)</h3>
+      <h3>📉 Top Loss (24h)</h3>
       <div id="crash">-</div>
       <small>Stärkster Fall</small>
     </div>
     <div class="card" id="investCard">
       <h3>💎 Kaufempfehlung</h3>
       <div id="invest">-</div>
-      <small>Unterbewertet</small>
+      <small>Unterbewertet (24h)</small>
     </div>
     <div class="card" id="sellCard">
       <h3>💰 Verkaufsempfehlung</h3>
       <div id="sell">-</div>
-      <small>Überbewertet</small>
+      <small>Überbewertet (24h)</small>
     </div>
   </div>
 
-  <!-- Market Table mit Suchfunktion -->
+  <!-- Market Table mit Bildern -->
   <div class="table-container" id="tableContainer">
     <div class="table-header">
       <h2>📊 Marktübersicht</h2>
@@ -401,9 +508,8 @@ canvas {
           <th>24h High</th>
           <th>24h Low</th>
           <th>Aktuell</th>
-          <th>1h %</th>
-          <th>2h %</th>
-          <th>Signal</th>
+          <th>24h %</th>
+          <th>Signal (24h)</th>
           <th>Volumen</th>
         </tr>
       </thead>
@@ -434,13 +540,30 @@ canvas {
     <h2>📈 Markt-Trends</h2>
     <div class="chart-grid">
       <div class="chart-card" id="spikeChartCard">
-        <h3>📈 Top 5 Gainers (Wellen)</h3>
+        <h3>📈 Top 5 Gainers (24h)</h3>
         <canvas id="spikeChart"></canvas>
       </div>
       <div class="chart-card" id="crashChartCard">
-        <h3>📉 Top 5 Losers (Wellen)</h3>
+        <h3>📉 Top 5 Losers (24h)</h3>
         <canvas id="crashChart"></canvas>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal für Item-Detail -->
+<div id="itemModal" class="modal">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <div class="modal-header">
+      <img id="modalItemIcon" src="" alt="Item Icon">
+      <h2 id="modalItemName">-</h2>
+    </div>
+    <div class="modal-stats" id="modalStats">
+      <!-- wird per JS befüllt -->
+    </div>
+    <div class="modal-chart">
+      <canvas id="modalChart"></canvas>
     </div>
   </div>
 </div>
@@ -448,7 +571,7 @@ canvas {
 <script>
 // ==================== KONFIGURATION ====================
 const API = "https://api.donut.auction/orders";
-const STORAGE_KEY = "donut_dashboard_v5";
+const STORAGE_KEY = "donut_dashboard_v4";
 
 const BIG_DROPS = [
   'NETHERITE_BLOCK', 'NETHERITE_INGOT', 'BEACON', 'DRAGON_EGG', 
@@ -456,6 +579,13 @@ const BIG_DROPS = [
   'TOTEM_OF_UNDYING', 'CONDUIT', 'HEART_OF_THE_SEA', 'SPAWNER',
   'DIAMOND_BLOCK', 'EMERALD_BLOCK', 'GOLD_BLOCK', 'IRON_BLOCK'
 ];
+
+// Item-Bild-URLs (Minecraft-Texturen)
+function getItemIconUrl(itemName) {
+  // Normalisierung: kleinbuchstaben, unterstriche bleiben
+  const name = itemName.toLowerCase().replace(/\s+/g, '_');
+  return `https://minecraft-item-texture.pixels.xyz/${name}.png`;
+}
 
 // ==================== HILFSFUNKTIONEN ====================
 function loadHistory() { 
@@ -481,17 +611,16 @@ function getPriceBefore(itemData, msAgo) {
   if (!itemData.history || itemData.history.length === 0) return null;
   const now = Date.now();
   const targetTime = now - msAgo;
-  // Suche den letzten Eintrag vor targetTime
   for (let i = itemData.history.length - 1; i >= 0; i--) {
     if (itemData.history[i].x <= targetTime) {
       return itemData.history[i].y;
     }
   }
-  return null; // nichts gefunden
+  return null;
 }
 
-// Signal-Berechnung
-function getSignal(item) {
+// 24h-Signal basierend auf Position im 24h-Bereich + Volumen-Trend
+function getSignal24h(item) {
   const now = item.now;
   const high = item.high;
   const low = item.low;
@@ -501,8 +630,18 @@ function getSignal(item) {
   
   const position = (now - low) / range; // 0 = bottom, 1 = top
   
-  if (position < 0.15) return { text: '🔥 STARK KAUFEN', class: 'green' };
-  if (position > 0.85) return { text: '💰 STARK VERKAUFEN', class: 'red' };
+  // Preis vor 24h (falls vorhanden) für Trend
+  const price24hAgo = getPriceBefore(item, 86400000);
+  let trend = 0;
+  if (price24hAgo !== null) {
+    trend = (now - price24hAgo) / price24hAgo; // positiv = gestiegen, negativ = gefallen
+  }
+  
+  // Kombinierte Logik: Wenn Preis nahe Low und Trend positiv oder neutral -> Kaufen
+  // Wenn Preis nahe High und Trend negativ -> Verkaufen
+  // Ansonsten Position basierend auf 24h-Spanne
+  if (position < 0.2 && trend > -0.05) return { text: '🔥 STARK KAUFEN', class: 'green' };
+  if (position > 0.8 && trend < 0.05) return { text: '💰 STARK VERKAUFEN', class: 'red' };
   if (position < 0.35) return { text: '📈 Kaufen', class: 'green' };
   if (position > 0.65) return { text: '📉 Verkaufen', class: 'red' };
   return { text: '⏸ Halten', class: 'purple' };
@@ -524,7 +663,7 @@ function filterTable() {
   currentFilter = filter;
   
   for (let i = 1; i < tr.length; i++) {
-    const td = tr[i].getElementsByTagName('td')[0];
+    const td = tr[i].getElementsByTagName('td')[1]; // Item-Name ist in der zweiten Spalte (nach Bild)
     if (td) {
       const txtValue = td.textContent || td.innerText;
       if (txtValue.toUpperCase().indexOf(filter) > -1) {
@@ -557,7 +696,7 @@ function showAllItems() {
 }
 
 // ==================== DEMO-DATEN (FALLBACK) ====================
-function generateWaveData(basePrice, volatility = 0.05, points = 30, isBigDrop = false) {
+function generateWaveData(basePrice, volatility = 0.05, points = 48, isBigDrop = false) {
   const data = [];
   let price = basePrice;
   const now = Date.now();
@@ -586,7 +725,7 @@ function generateDemoData() {
       low: basePrice * (1 - Math.random() * 0.3),
       now: basePrice * (1 + (Math.random() - 0.5) * 0.2),
       volume: Math.floor(Math.random() * 50 + 5),
-      history: generateWaveData(basePrice, 0.1, 30, false)
+      history: generateWaveData(basePrice, 0.1, 48, false)
     };
   });
   
@@ -602,7 +741,7 @@ function generateBigDropDemoData() {
       low: basePrice * (1 - Math.random() * 0.5),
       now: basePrice * (1 + (Math.random() - 0.5) * 0.6),
       volume: Math.floor(Math.random() * 100 + 10),
-      history: generateWaveData(basePrice, 0.25, 40, true)
+      history: generateWaveData(basePrice, 0.25, 48, true)
     };
   });
   return items;
@@ -614,24 +753,31 @@ function renderTable(history) {
   table.innerHTML = "";
   
   Object.entries(history).forEach(([item, h]) => {
-    const price1hAgo = getPriceBefore(h, 3600000); // 1 Stunde
-    const price2hAgo = getPriceBefore(h, 7200000); // 2 Stunden
-    const diff10 = price1hAgo !== null ? percentDiff(h.now, price1hAgo) : 0;
-    const diff20 = price2hAgo !== null ? percentDiff(h.now, price2hAgo) : 0;
-    const signal = getSignal(h);
+    const price24hAgo = getPriceBefore(h, 86400000); // 24 Stunden
+    const diff24 = price24hAgo !== null ? percentDiff(h.now, price24hAgo) : 0;
+    const signal = getSignal24h(h);
     const isBigDrop = BIG_DROPS.includes(item);
+    const iconUrl = getItemIconUrl(item);
     
-    table.innerHTML += `
-      <tr ${isBigDrop ? 'class="highlight"' : ''}>
-        <td><strong>${item} ${isBigDrop ? '💎' : ''}</strong></td>
-        <td>${h.high ? h.high.toFixed(2) : '0'}</td>
-        <td>${h.low ? h.low.toFixed(2) : '0'}</td>
-        <td><strong>${h.now ? h.now.toFixed(2) : '0'}</strong></td>
-        <td class="${diff10 >= 0 ? 'green' : 'red'}">${diff10}%</td>
-        <td class="${diff20 >= 0 ? 'green' : 'red'}">${diff20}%</td>
-        <td class="${signal.class}">${signal.text}</td>
-        <td>${h.volume || 0}</td>
-      </tr>`;
+    const row = document.createElement('tr');
+    row.setAttribute('data-item', item);
+    if (isBigDrop) row.classList.add('highlight');
+    row.onclick = () => openModal(item, h);
+    
+    row.innerHTML = `
+      <td style="display: flex; align-items: center; gap: 10px;">
+        <img src="${iconUrl}" alt="${item}" class="item-icon" onerror="this.src='https://via.placeholder.com/32?text=?'">
+        <span>${item}</span>
+      </td>
+      <td>${h.high ? h.high.toFixed(2) : '0'}</td>
+      <td>${h.low ? h.low.toFixed(2) : '0'}</td>
+      <td><strong>${h.now ? h.now.toFixed(2) : '0'}</strong></td>
+      <td class="${diff24 >= 0 ? 'green' : 'red'}">${diff24}%</td>
+      <td class="${signal.class}">${signal.text}</td>
+      <td>${h.volume || 0}</td>
+    `;
+    
+    table.appendChild(row);
   });
   
   document.getElementById('tableContainer').classList.add('visible');
@@ -640,22 +786,24 @@ function renderTable(history) {
 
 function renderTopCards(history) {
   const stats = Object.entries(history).map(([item, h]) => {
-    const price1hAgo = getPriceBefore(h, 3600000);
-    const diff10 = price1hAgo !== null ? ((h.now - price1hAgo) / price1hAgo * 100) : 0;
-    return { item, ...h, diff10 };
+    const price24hAgo = getPriceBefore(h, 86400000);
+    const diff24 = price24hAgo !== null ? ((h.now - price24hAgo) / price24hAgo * 100) : 0;
+    return { item, ...h, diff24 };
   });
   
-  stats.sort((a, b) => b.diff10 - a.diff10);
+  stats.sort((a, b) => b.diff24 - a.diff24);
   const spike = stats[0];
-  const crash = [...stats].sort((a, b) => a.diff10 - b.diff10)[0];
+  const crash = [...stats].sort((a, b) => a.diff24 - b.diff24)[0];
   
-  const invest = [...stats].sort((a, b) => (a.now / a.high) - (b.now / b.high))[0];
-  const sell = [...stats].sort((a, b) => (b.now / b.low) - (a.now / a.low))[0];
+  // Kaufempfehlung: niedrigster Preis relativ zum 24h-High, aber mit Volumen > 0
+  const invest = [...stats].filter(s => s.volume > 0).sort((a, b) => (a.now / a.high) - (b.now / b.high))[0];
+  // Verkaufsempfehlung: höchster Preis relativ zum 24h-Low
+  const sell = [...stats].filter(s => s.volume > 0).sort((a, b) => (b.now / b.low) - (a.now / a.low))[0];
   
   document.getElementById("spike").innerHTML = spike ? 
-    `${spike.item} <span style="font-size:1rem">+${spike.diff10.toFixed(1)}%</span>` : "-";
+    `${spike.item} <span style="font-size:1rem">+${spike.diff24.toFixed(1)}%</span>` : "-";
   document.getElementById("crash").innerHTML = crash ? 
-    `${crash.item} <span style="font-size:1rem">${crash.diff10.toFixed(1)}%</span>` : "-";
+    `${crash.item} <span style="font-size:1rem">${crash.diff24.toFixed(1)}%</span>` : "-";
   document.getElementById("invest").innerHTML = invest ? 
     `${invest.item} <span style="font-size:0.9rem">(${((invest.now/invest.high)*100).toFixed(0)}% v. High)</span>` : "-";
   document.getElementById("sell").innerHTML = sell ? 
@@ -666,31 +814,31 @@ function renderTopCards(history) {
 
 function renderTicker(history) {
   const stats = Object.entries(history).map(([item, h]) => {
-    const price1hAgo = getPriceBefore(h, 3600000);
-    const diff10 = price1hAgo !== null ? ((h.now - price1hAgo) / price1hAgo * 100) : 0;
-    return { item, diff10, now: h.now };
+    const price24hAgo = getPriceBefore(h, 86400000);
+    const diff24 = price24hAgo !== null ? ((h.now - price24hAgo) / price24hAgo * 100) : 0;
+    return { item, diff24, now: h.now };
   });
   
   const tickerText = stats.map(s => 
-    `${s.item}: ${s.now.toFixed(2)} (${s.diff10 > 0 ? '+' : ''}${s.diff10.toFixed(1)}%)`
+    `${s.item}: ${s.now.toFixed(2)} (${s.diff24 > 0 ? '+' : ''}${s.diff24.toFixed(1)}%)`
   ).join(' • ');
   
   document.getElementById('tickerContent').innerHTML = tickerText;
 }
 
-// Charts rendern
+// Charts rendern (global)
 let spikeChart, crashChart, bigDropChart, volumeChart;
 
 function renderCharts(history) {
   const stats = Object.entries(history).map(([item, h]) => {
-    const price1hAgo = getPriceBefore(h, 3600000);
-    const diff10 = price1hAgo !== null ? ((h.now - price1hAgo) / price1hAgo * 100) : 0;
-    return { item, ...h, diff10 };
+    const price24hAgo = getPriceBefore(h, 86400000);
+    const diff24 = price24hAgo !== null ? ((h.now - price24hAgo) / price24hAgo * 100) : 0;
+    return { item, ...h, diff24 };
   });
   
-  stats.sort((a, b) => b.diff10 - a.diff10);
+  stats.sort((a, b) => b.diff24 - a.diff24);
   const topSpikes = stats.slice(0, 5);
-  const topCrashes = [...stats].sort((a, b) => a.diff10 - b.diff10).slice(0, 5);
+  const topCrashes = [...stats].sort((a, b) => a.diff24 - b.diff24).slice(0, 5);
 
   const spikeDatasets = topSpikes.map((d, i) => ({
     label: d.item,
@@ -835,6 +983,71 @@ function renderBigDropCharts(history) {
   document.getElementById('volumeChartCard').classList.add('visible');
 }
 
+// ==================== MODAL FÜR ITEM-DETAIL ====================
+let modalChartInstance = null;
+
+function openModal(itemName, itemData) {
+  const modal = document.getElementById('itemModal');
+  document.getElementById('modalItemName').textContent = itemName;
+  document.getElementById('modalItemIcon').src = getItemIconUrl(itemName);
+  
+  // Statistiken
+  const price24hAgo = getPriceBefore(itemData, 86400000);
+  const diff24 = price24hAgo !== null ? percentDiff(itemData.now, price24hAgo) : 0;
+  const signal = getSignal24h(itemData);
+  
+  document.getElementById('modalStats').innerHTML = `
+    <div class="stat-item"><span class="stat-label">24h High</span><span class="stat-value">${itemData.high.toFixed(2)}</span></div>
+    <div class="stat-item"><span class="stat-label">24h Low</span><span class="stat-value">${itemData.low.toFixed(2)}</span></div>
+    <div class="stat-item"><span class="stat-label">Aktuell</span><span class="stat-value">${itemData.now.toFixed(2)}</span></div>
+    <div class="stat-item"><span class="stat-label">24h %</span><span class="stat-value ${diff24 >= 0 ? 'green' : 'red'}">${diff24}%</span></div>
+    <div class="stat-item"><span class="stat-label">Signal</span><span class="stat-value ${signal.class}">${signal.text}</span></div>
+    <div class="stat-item"><span class="stat-label">Volumen</span><span class="stat-value">${itemData.volume || 0}</span></div>
+  `;
+  
+  // Chart rendern
+  const ctx = document.getElementById('modalChart').getContext('2d');
+  if (modalChartInstance) modalChartInstance.destroy();
+  
+  modalChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: itemName,
+        data: itemData.history,
+        borderColor: '#00ffaa',
+        backgroundColor: 'rgba(0,255,170,0.1)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 2,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      parsing: { xAxisKey: 'x', yAxisKey: 'y' },
+      scales: {
+        x: { type: 'time', time: { unit: 'hour' }, ticks: { color: 'white' } },
+        y: { ticks: { color: 'white' } }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+  
+  modal.style.display = 'flex';
+}
+
+// Modal schließen
+document.querySelector('.close').onclick = function() {
+  document.getElementById('itemModal').style.display = 'none';
+};
+
+window.onclick = function(event) {
+  const modal = document.getElementById('itemModal');
+  if (event.target == modal) {
+    modal.style.display = 'none';
+  }
+};
+
 // ==================== API FETCH & UPDATE ====================
 async function fetchData() {
   try {
@@ -846,7 +1059,7 @@ async function fetchData() {
     orders.forEach(o => {
       const item = o.item.itemId;
       const price = o.itemPrice;
-      const timestamp = Date.now(); // aktueller Zeitstempel
+      const timestamp = Date.now();
       
       if (!history[item]) {
         history[item] = { 
@@ -857,14 +1070,12 @@ async function fetchData() {
           history: []
         };
       } else {
-        // High/Low aktualisieren
         if (price > history[item].high) history[item].high = price;
         if (price < history[item].low) history[item].low = price;
         history[item].now = price;
         history[item].volume = (history[item].volume || 0) + 1;
       }
       
-      // Preishistorie erweitern (maximal 200 Einträge pro Item)
       if (!history[item].history) history[item].history = [];
       history[item].history.push({ x: timestamp, y: price });
       if (history[item].history.length > 200) history[item].history.shift();
@@ -872,16 +1083,23 @@ async function fetchData() {
 
     saveHistory(history);
     
-    // Alle Komponenten neu rendern
     renderTable(history);
     renderTopCards(history);
     renderCharts(history);
     renderBigDropCharts(history);
     renderTicker(history);
     
+    // Falls Modal offen ist, aktualisieren
+    const modal = document.getElementById('itemModal');
+    if (modal.style.display === 'flex') {
+      const itemName = document.getElementById('modalItemName').textContent;
+      if (history[itemName]) {
+        openModal(itemName, history[itemName]);
+      }
+    }
+    
   } catch (e) {
     console.log("API Error, verwende Demo-Daten", e);
-    // Falls noch gar keine Daten da sind, Demo generieren
     let history = loadHistory();
     if (Object.keys(history).length === 0) {
       history = { ...generateDemoData(), ...generateBigDropDemoData() };
@@ -896,17 +1114,14 @@ async function fetchData() {
 }
 
 // ==================== SOFORTIGES LADEN ====================
-// 1. Versuche vorhandene Daten aus localStorage zu laden
 let initialHistory = loadHistory();
 if (Object.keys(initialHistory).length > 0) {
-  // Sofort anzeigen
   renderTable(initialHistory);
   renderTopCards(initialHistory);
   renderCharts(initialHistory);
   renderBigDropCharts(initialHistory);
   renderTicker(initialHistory);
 } else {
-  // Falls nichts da, Demo-Daten generieren und anzeigen
   initialHistory = { ...generateDemoData(), ...generateBigDropDemoData() };
   renderTable(initialHistory);
   renderTopCards(initialHistory);
@@ -915,13 +1130,10 @@ if (Object.keys(initialHistory).length > 0) {
   renderTicker(initialHistory);
 }
 
-// 2. Dann API im Hintergrund laden und aktualisieren
 fetchData();
-
-// 3. Regelmäßige Aktualisierung alle 60 Sekunden
 setInterval(fetchData, 60000);
 
-// 4. Reset um Mitternacht
+// Reset um Mitternacht
 setInterval(() => {
   const now = new Date();
   if (now.getHours() === 0 && now.getMinutes() === 0) resetData();
@@ -929,7 +1141,7 @@ setInterval(() => {
 
 // ==================== HINTERGRUND-ANIMATION ====================
 const bgCanvas = document.getElementById('backgroundCanvas');
-const ctx = bgCanvas.getContext('2d');
+const ctxBg = bgCanvas.getContext('2d');
 bgCanvas.width = window.innerWidth;
 bgCanvas.height = window.innerHeight;
 
@@ -945,7 +1157,7 @@ for (let i = 0; i < 150; i++) {
 }
 
 function animateBackground() {
-  ctx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+  ctxBg.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
   
   points.forEach(p => {
     p.x += Math.sin(p.angle) * p.speed;
@@ -955,10 +1167,10 @@ function animateBackground() {
     if (p.x < 0 || p.x > bgCanvas.width) p.angle += Math.PI;
     if (p.y < 0 || p.y > bgCanvas.height) p.angle += Math.PI;
     
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(100, 200, 255, ${p.r * 0.1})`;
-    ctx.fill();
+    ctxBg.beginPath();
+    ctxBg.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctxBg.fillStyle = `rgba(100, 200, 255, ${p.r * 0.1})`;
+    ctxBg.fill();
   });
   
   requestAnimationFrame(animateBackground);
@@ -970,7 +1182,7 @@ window.addEventListener('resize', () => {
   bgCanvas.height = window.innerHeight;
 });
 
-// Scroll-Animation für Sichtbarkeit
+// Scroll-Animation
 function animateElements() {
   document.querySelectorAll('.card, .table-container, .chart-card').forEach(el => {
     if (el.getBoundingClientRect().top < window.innerHeight - 50) {
@@ -979,7 +1191,7 @@ function animateElements() {
   });
 }
 window.addEventListener('scroll', animateElements);
-animateElements(); // einmal ausführen
+animateElements();
 </script>
 </body>
 </html>
