@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>❄ DonutSMP Market Tracker</title>
+<title>❄ DonutSMP Market Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-body{
+body {
   margin:0;
-  font-family: Arial, sans-serif;
+  font-family:Arial, sans-serif;
   background:#0b0f1a;
   color:white;
   overflow-x:hidden;
@@ -16,14 +16,14 @@ body{
 }
 h1{text-align:center;padding:20px;}
 .container{width:95%;margin:auto;}
-.cards{
+.cards {
   display:flex;
   gap:20px;
   justify-content:center;
   flex-wrap:wrap;
   margin-bottom:20px;
 }
-.card{
+.card {
   background:rgba(255,255,255,0.05);
   padding:20px;
   border-radius:12px;
@@ -31,16 +31,22 @@ h1{text-align:center;padding:20px;}
   min-width:260px;
   text-align:center;
   box-shadow:0 0 15px rgba(255,255,255,0.05);
-  transition: transform 0.3s;
+  transition: transform 0.4s, opacity 0.6s;
+  opacity:0;
 }
-.card:hover{transform: scale(1.05);}
-table{
+.card.visible{opacity:1; transform:translateY(0);}
+.card.initial{transform:translateY(20px);}
+table {
   width:100%;
   border-collapse:collapse;
   background:rgba(255,255,255,0.05);
   border-radius:10px;
   overflow:hidden;
+  margin-bottom:30px;
+  opacity:0;
+  transition:opacity 0.8s;
 }
+table.visible{opacity:1;}
 th,td{padding:10px;text-align:left;}
 th{background:rgba(255,255,255,0.1);}
 tr:nth-child(even){background:rgba(255,255,255,0.03);}
@@ -64,7 +70,10 @@ canvas{
   margin:auto;
   max-width:100%;
   margin-top:30px;
+  opacity:0;
+  transition:opacity 0.8s;
 }
+canvas.visible{opacity:1;}
 #backgroundCanvas{
   position:fixed;
   top:0;
@@ -79,10 +88,9 @@ canvas{
 </style>
 </head>
 <body>
-
 <canvas id="backgroundCanvas"></canvas>
 
-<h1>❄ DonutSMP Market Tracker</h1>
+<h1>❄ DonutSMP Market Dashboard</h1>
 
 <div class="container">
   <div style="text-align:center;">
@@ -90,17 +98,17 @@ canvas{
   </div>
 
   <div class="cards">
-    <div class="card">
+    <div class="card initial">
       <h3>🔥 Biggest Spike (10 → Now)</h3>
       <div id="spike">-</div>
     </div>
-    <div class="card">
+    <div class="card initial">
       <h3>📉 Biggest Crash (10 → Now)</h3>
       <div id="crash">-</div>
     </div>
   </div>
 
-  <table>
+  <table id="marketTable">
     <thead>
       <tr>
         <th>Item</th>
@@ -120,7 +128,7 @@ canvas{
 
 <script>
 const API="https://api.donut.auction/orders";
-const STORAGE_KEY="donut_history_v3";
+const STORAGE_KEY="donut_dashboard_v1";
 
 function loadHistory(){return JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}");}
 function saveHistory(data){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}
@@ -141,12 +149,10 @@ async function fetchData(){
       if(!history[item]){
         history[item]={high:price, low:price, at10:null, at20:null, now:price, history:[]};
       }
-
       if(price>history[item].high) history[item].high=price;
       if(price<history[item].low) history[item].low=price;
       if(hour===10 && !history[item].at10) history[item].at10=price;
       if(hour===20 && !history[item].at20) history[item].at20=price;
-
       history[item].now=price;
       history[item].history.push({time:Date.now(),price});
     });
@@ -154,7 +160,7 @@ async function fetchData(){
     saveHistory(history);
     renderTable(history);
     renderCharts(history);
-
+    animateElements();
   }catch(e){console.log("API Error",e);}
 }
 
@@ -164,7 +170,6 @@ function renderTable(history){
   const table=document.getElementById("tableBody");
   table.innerHTML="";
   let stats=[];
-
   for(const item in history){
     const h=history[item];
     const diff10=percentDiff(h.now,h.at10);
@@ -180,7 +185,6 @@ function renderTable(history){
         <td class="${diff20>=0?'green':'red'}">${diff20}%</td>
       </tr>`;
   }
-
   if(stats.length>0){
     const spike=[...stats].sort((a,b)=>b.diff10-a.diff10)[0];
     const crash=[...stats].sort((a,b)=>a.diff10-b.diff10)[0];
@@ -189,7 +193,6 @@ function renderTable(history){
   }
 }
 
-// Charts
 let spikeChart, crashChart;
 function renderCharts(history){
   const stats=Object.entries(history).map(([item,h])=>({item,...h,diff10:percentDiff(h.now,h.at10)}));
@@ -198,23 +201,10 @@ function renderCharts(history){
   const topCrashes=stats.slice(-5);
 
   const spikeDatasets=topSpikes.map(d=>{
-    return {
-      label:d.item,
-      data:d.history.map(h=>({x:h.time, y:h.price})),
-      borderColor:'hsl(' + Math.random()*360 + ', 100%, 60%)',
-      fill:false,
-      tension:0.3
-    }
+    return {label:d.item,data:d.history.map(h=>({x:h.time,y:h.price})),borderColor:'hsl(' + Math.random()*360 + ',100%,60%)',fill:false,tension:0.3};
   });
-
   const crashDatasets=topCrashes.map(d=>{
-    return {
-      label:d.item,
-      data:d.history.map(h=>({x:h.time, y:h.price})),
-      borderColor:'hsl(' + Math.random()*360 + ', 100%, 60%)',
-      fill:false,
-      tension:0.3
-    }
+    return {label:d.item,data:d.history.map(h=>({x:h.time,y:h.price})),borderColor:'hsl(' + Math.random()*360 + ',100%,60%)',fill:false,tension:0.3};
   });
 
   const ctxSpike=document.getElementById('spikeChart').getContext('2d');
@@ -224,8 +214,8 @@ function renderCharts(history){
     data:{datasets:spikeDatasets},
     options:{
       parsing:{xAxisKey:'x',yAxisKey:'y'},
-      animation:false,
-      scales:{x:{type:'time',time:{unit:'minute'},ticks:{color:'white'}}, y:{ticks:{color:'white'}}},
+      animation:{duration:800},
+      scales:{x:{type:'time',time:{unit:'minute'},ticks:{color:'white'}},y:{ticks:{color:'white'}}},
       plugins:{legend:{labels:{color:'white'}}}
     }
   });
@@ -237,12 +227,26 @@ function renderCharts(history){
     data:{datasets:crashDatasets},
     options:{
       parsing:{xAxisKey:'x',yAxisKey:'y'},
-      animation:false,
-      scales:{x:{type:'time',time:{unit:'minute'},ticks:{color:'white'}}, y:{ticks:{color:'white'}}},
+      animation:{duration:800},
+      scales:{x:{type:'time',time:{unit:'minute'},ticks:{color:'white'}},y:{ticks:{color:'white'}}},
       plugins:{legend:{labels:{color:'white'}}}
     }
   });
 }
+
+// Animation beim Scrollen
+function animateElements(){
+  document.querySelectorAll('.card.initial').forEach(el=>{
+    if(el.getBoundingClientRect().top < window.innerHeight - 50) el.classList.add('visible');
+  });
+  if(document.getElementById('marketTable').getBoundingClientRect().top < window.innerHeight - 50){
+    document.getElementById('marketTable').classList.add('visible');
+  }
+  document.querySelectorAll('canvas').forEach(c=>{
+    if(c.getBoundingClientRect().top < window.innerHeight - 50) c.classList.add('visible');
+  });
+}
+window.addEventListener('scroll', animateElements);
 
 // Fetch jede Minute
 fetchData();
@@ -257,13 +261,12 @@ setInterval(()=>{
 // Hintergrundpunkte
 const canvas=document.getElementById('backgroundCanvas');
 const ctx=canvas.getContext('2d');
-canvas.width=window.innerWidth;
-canvas.height=window.innerHeight;
+canvas.width=window.innerWidth; canvas.height=window.innerHeight;
 let points=[];
 for(let i=0;i<200;i++){
-  points.push({x:Math.random()*canvas.width, y:Math.random()*canvas.height, r:Math.random()*2+1, speed:Math.random()*0.5+0.2});
+  points.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*2+1,speed:Math.random()*0.5+0.2});
 }
-function animate(){
+function animateBackground(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   points.forEach(p=>{
     p.y+=p.speed;
@@ -273,9 +276,9 @@ function animate(){
     ctx.fillStyle='white';
     ctx.fill();
   });
-  requestAnimationFrame(animate);
+  requestAnimationFrame(animateBackground);
 }
-animate();
+animateBackground();
 window.addEventListener('resize',()=>{canvas.width=window.innerWidth; canvas.height=window.innerHeight;});
 </script>
 
