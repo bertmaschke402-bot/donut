@@ -19,6 +19,28 @@ body {
   min-height: 100vh;
 }
 
+.made-by {
+  position: fixed;
+  top: 10px;
+  right: 20px;
+  color: rgba(255,255,255,0.3);
+  font-size: 0.9rem;
+  z-index: 100;
+  font-style: italic;
+  text-shadow: 0 0 10px rgba(0,255,255,0.2);
+  letter-spacing: 1px;
+  backdrop-filter: blur(5px);
+  padding: 5px 15px;
+  border-radius: 30px;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.made-by:hover {
+  color: rgba(255,255,255,0.8);
+  text-shadow: 0 0 15px cyan;
+}
+
 h1 {
   text-align: center;
   padding: 30px 20px;
@@ -222,6 +244,7 @@ tr:hover td {
   margin-right: 10px;
   image-rendering: pixelated;
   filter: drop-shadow(0 0 5px rgba(255,255,255,0.3));
+  border-radius: 4px;
 }
 
 .green { color: #00ff88; font-weight: bold; text-shadow: 0 0 10px #00ff8844; }
@@ -293,6 +316,7 @@ canvas {
   height: auto !important;
   max-height: 400px;
   border-radius: 10px;
+  background: rgba(0,0,0,0.2);
 }
 
 .large-chart canvas {
@@ -386,6 +410,7 @@ canvas {
   font-weight: bold;
   cursor: pointer;
   transition: color 0.2s;
+  z-index: 10;
 }
 
 .close:hover {
@@ -405,6 +430,7 @@ canvas {
   width: 64px;
   height: 64px;
   image-rendering: pixelated;
+  border-radius: 8px;
 }
 
 .modal-header h2 {
@@ -445,24 +471,33 @@ canvas {
   max-height: 400px;
 }
 
+.last-update {
+  text-align: center;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.8rem;
+  margin-top: 10px;
+}
+
 @media (max-width: 768px) {
   .chart-grid { grid-template-columns: 1fr; }
   h1 { font-size: 1.8rem; }
   .card div { font-size: 1.3rem; }
   .search-box { width: 100%; }
   .modal-header { flex-direction: column; text-align: center; }
+  .made-by { font-size: 0.7rem; top: 5px; right: 10px; }
 }
 </style>
 </head>
 <body>
+<div class="made-by">Made by Bertmaschke</div>
 <canvas id="backgroundCanvas"></canvas>
 
 <h1>❄ DonutSMP Market Dashboard v4</h1>
 
 <div class="container">
   <div class="controls">
-    <input type="text" class="search-box" id="searchInput" placeholder="🔍 Nach Items suchen... (z.B. NETHERITE, DIAMOND)" onkeyup="filterTable()">
-    <button onclick="resetData()">↻ Tagesdaten zurücksetzen</button>
+    <input type="text" class="search-box" id="searchInput" placeholder="🔍 Nach Items suchen..." onkeyup="filterTable()">
+    <button onclick="resetData()">↻ Daten zurücksetzen</button>
     <button onclick="showAllItems()" id="showAllBtn" style="display: none;">Alle anzeigen</button>
   </div>
 
@@ -516,21 +551,22 @@ canvas {
       <tbody id="tableBody"></tbody>
     </table>
     <div id="noResults" class="no-results" style="display: none;">🔍 Keine Items gefunden</div>
+    <div class="last-update" id="lastUpdate"></div>
   </div>
 
   <!-- Spezielle Sektion für Große Drops -->
   <div class="chart-section" id="bigDropsSection">
     <h2>💥 BIG DROPS TRACKER <span class="large-badge">LIVE</span></h2>
-    <p style="margin-bottom: 20px; opacity: 0.8;">Spezial-Tracking für seltene Items wie NETHERITE_BLOCK, BEACON, DRAGON_EGG, SHULKER_BOX</p>
+    <p style="margin-bottom: 20px; opacity: 0.8;">Spezial-Tracking für seltene Items</p>
     
     <div class="chart-grid">
       <div class="chart-card large-chart" id="bigDropChartCard">
         <h3>🚀 Top 5 Big Drops <span class="badge">Volatil</span></h3>
-        <canvas id="bigDropChart" style="max-height: 500px;"></canvas>
+        <canvas id="bigDropChart"></canvas>
       </div>
       <div class="chart-card" id="volumeChartCard">
         <h3>📊 Handelsvolumen Big Drops</h3>
-        <canvas id="volumeChart" style="max-height: 300px;"></canvas>
+        <canvas id="volumeChart"></canvas>
       </div>
     </div>
   </div>
@@ -559,9 +595,7 @@ canvas {
       <img id="modalItemIcon" src="" alt="Item Icon">
       <h2 id="modalItemName">-</h2>
     </div>
-    <div class="modal-stats" id="modalStats">
-      <!-- wird per JS befüllt -->
-    </div>
+    <div class="modal-stats" id="modalStats"></div>
     <div class="modal-chart">
       <canvas id="modalChart"></canvas>
     </div>
@@ -571,7 +605,7 @@ canvas {
 <script>
 // ==================== KONFIGURATION ====================
 const API = "https://api.donut.auction/orders";
-const STORAGE_KEY = "donut_dashboard_v4";
+const STORAGE_KEY = "donut_dashboard_v4_fixed";
 
 const BIG_DROPS = [
   'NETHERITE_BLOCK', 'NETHERITE_INGOT', 'BEACON', 'DRAGON_EGG', 
@@ -580,20 +614,54 @@ const BIG_DROPS = [
   'DIAMOND_BLOCK', 'EMERALD_BLOCK', 'GOLD_BLOCK', 'IRON_BLOCK'
 ];
 
-// Item-Bild-URLs (Minecraft-Texturen)
+// Funktionierende Minecraft-Item-Bilder (offizielle MC-Texturen)
 function getItemIconUrl(itemName) {
-  // Normalisierung: kleinbuchstaben, unterstriche bleiben
-  const name = itemName.toLowerCase().replace(/\s+/g, '_');
-  return `https://minecraft-item-texture.pixels.xyz/${name}.png`;
+  const name = itemName.toLowerCase().replace(/_/g, '_');
+  
+  // Mapping für spezielle Items
+  const specialMapping = {
+    'elytra': 'elytra',
+    'netherite_block': 'netherite_block',
+    'netherite_ingot': 'netherite_ingot',
+    'beacon': 'beacon',
+    'dragon_egg': 'dragon_egg',
+    'shulker_box': 'shulker_box',
+    'totem_of_undying': 'totem_of_undying',
+    'conduit': 'conduit',
+    'heart_of_the_sea': 'heart_of_the_sea',
+    'spawner': 'spawner',
+    'diamond_block': 'diamond_block',
+    'emerald_block': 'emerald_block',
+    'gold_block': 'gold_block',
+    'iron_block': 'iron_block',
+    'diamond': 'diamond',
+    'gold_ingot': 'gold_ingot',
+    'iron_ingot': 'iron_ingot',
+    'emerald': 'emerald',
+    'obsidian': 'obsidian',
+    'ender_pearl': 'ender_pearl',
+    'blaze_rod': 'blaze_rod'
+  };
+  
+  const imageName = specialMapping[name] || name;
+  return `https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20.4/assets/minecraft/textures/item/${imageName}.png`;
 }
 
 // ==================== HILFSFUNKTIONEN ====================
 function loadHistory() { 
-  return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); 
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); 
+  } catch {
+    return {};
+  }
 }
 
 function saveHistory(data) { 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); 
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); 
+  } catch (e) {
+    console.log("Storage error:", e);
+  }
 }
 
 function resetData() { 
@@ -602,21 +670,25 @@ function resetData() {
 }
 
 function percentDiff(current, old) {
-  if (!old || old === 0) return 0; 
+  if (!old || old === 0) return "0.00"; 
   return ((current - old) / old * 100).toFixed(2);
 }
 
 // Preis vor X Millisekunden aus der Historie holen
 function getPriceBefore(itemData, msAgo) {
-  if (!itemData.history || itemData.history.length === 0) return null;
+  if (!itemData || !itemData.history || itemData.history.length === 0) return null;
   const now = Date.now();
   const targetTime = now - msAgo;
-  for (let i = itemData.history.length - 1; i >= 0; i--) {
-    if (itemData.history[i].x <= targetTime) {
-      return itemData.history[i].y;
+  
+  // Sortieren falls nötig (sicherheitshalber)
+  const sorted = [...itemData.history].sort((a, b) => a.x - b.x);
+  
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    if (sorted[i].x <= targetTime) {
+      return sorted[i].y;
     }
   }
-  return null;
+  return sorted.length > 0 ? sorted[0].y : null; // ältesten Preis nehmen
 }
 
 // 24h-Signal basierend auf Position im 24h-Bereich + Volumen-Trend
@@ -634,16 +706,14 @@ function getSignal24h(item) {
   const price24hAgo = getPriceBefore(item, 86400000);
   let trend = 0;
   if (price24hAgo !== null) {
-    trend = (now - price24hAgo) / price24hAgo; // positiv = gestiegen, negativ = gefallen
+    trend = (now - price24hAgo) / price24hAgo; // positiv = gestiegen
   }
   
-  // Kombinierte Logik: Wenn Preis nahe Low und Trend positiv oder neutral -> Kaufen
-  // Wenn Preis nahe High und Trend negativ -> Verkaufen
-  // Ansonsten Position basierend auf 24h-Spanne
-  if (position < 0.2 && trend > -0.05) return { text: '🔥 STARK KAUFEN', class: 'green' };
-  if (position > 0.8 && trend < 0.05) return { text: '💰 STARK VERKAUFEN', class: 'red' };
-  if (position < 0.35) return { text: '📈 Kaufen', class: 'green' };
-  if (position > 0.65) return { text: '📉 Verkaufen', class: 'red' };
+  // Kombinierte Logik
+  if (position < 0.2 && trend > -0.05) return { text: '🔥 KAUFEN', class: 'green' };
+  if (position > 0.8 && trend < 0.05) return { text: '💰 VERKAUFEN', class: 'red' };
+  if (position < 0.35) return { text: '📈 Leichter Kauf', class: 'green' };
+  if (position > 0.65) return { text: '📉 Leichter Verkauf', class: 'red' };
   return { text: '⏸ Halten', class: 'purple' };
 }
 
@@ -663,10 +733,10 @@ function filterTable() {
   currentFilter = filter;
   
   for (let i = 1; i < tr.length; i++) {
-    const td = tr[i].getElementsByTagName('td')[1]; // Item-Name ist in der zweiten Spalte (nach Bild)
+    const td = tr[i].getElementsByTagName('td')[0];
     if (td) {
-      const txtValue = td.textContent || td.innerText;
-      if (txtValue.toUpperCase().indexOf(filter) > -1) {
+      const itemName = td.innerText || td.textContent;
+      if (itemName.toUpperCase().indexOf(filter) > -1) {
         tr[i].style.display = '';
         visibleCount++;
       } else {
@@ -685,7 +755,7 @@ function filterTable() {
     filterInfo.innerHTML = `🔍 Suche: "${input.value}" (${visibleCount} Treffer)`;
     showAllBtn.style.display = 'inline-block';
   } else {
-    filterInfo.innerHTML = `📊 Alle Items anzeigen (${visibleCount} sichtbar)`;
+    filterInfo.innerHTML = `📊 Alle Items (${visibleCount})`;
     showAllBtn.style.display = 'none';
   }
 }
@@ -695,66 +765,16 @@ function showAllItems() {
   filterTable();
 }
 
-// ==================== DEMO-DATEN (FALLBACK) ====================
-function generateWaveData(basePrice, volatility = 0.05, points = 48, isBigDrop = false) {
-  const data = [];
-  let price = basePrice;
-  const now = Date.now();
-  const hourMs = 3600000;
-  const actualVolatility = isBigDrop ? volatility * 2 : volatility;
-  
-  for (let i = points; i >= 0; i--) {
-    const time = now - (i * (hourMs / 2)); // 30-Minuten-Intervalle
-    const wave1 = Math.sin(i * 0.7) * actualVolatility * basePrice;
-    const wave2 = Math.cos(i * 0.4) * actualVolatility * basePrice * 0.5;
-    const random = (Math.random() - 0.5) * actualVolatility * basePrice * 0.3;
-    price = basePrice + wave1 + wave2 + random;
-    data.push({ x: time, y: Math.max(0.01, price) });
-  }
-  return data;
-}
-
-function generateDemoData() {
-  const items = ['DIAMOND', 'GOLD_INGOT', 'IRON_INGOT', 'EMERALD', 'OBSIDIAN', 'ENDER_PEARL', 'BLAZE_ROD'];
-  const history = {};
-  
-  items.forEach(item => {
-    const basePrice = Math.random() * 100 + 10;
-    history[item] = {
-      high: basePrice * (1 + Math.random() * 0.3),
-      low: basePrice * (1 - Math.random() * 0.3),
-      now: basePrice * (1 + (Math.random() - 0.5) * 0.2),
-      volume: Math.floor(Math.random() * 50 + 5),
-      history: generateWaveData(basePrice, 0.1, 48, false)
-    };
-  });
-  
-  return history;
-}
-
-function generateBigDropDemoData() {
-  const items = {};
-  BIG_DROPS.forEach(item => {
-    const basePrice = Math.random() * 1000 + 500;
-    items[item] = {
-      high: basePrice * (1 + Math.random() * 0.8),
-      low: basePrice * (1 - Math.random() * 0.5),
-      now: basePrice * (1 + (Math.random() - 0.5) * 0.6),
-      volume: Math.floor(Math.random() * 100 + 10),
-      history: generateWaveData(basePrice, 0.25, 48, true)
-    };
-  });
-  return items;
-}
-
 // ==================== RENDER FUNKTIONEN ====================
 function renderTable(history) {
   const table = document.getElementById("tableBody");
+  if (!table) return;
+  
   table.innerHTML = "";
   
   Object.entries(history).forEach(([item, h]) => {
-    const price24hAgo = getPriceBefore(h, 86400000); // 24 Stunden
-    const diff24 = price24hAgo !== null ? percentDiff(h.now, price24hAgo) : 0;
+    const price24hAgo = getPriceBefore(h, 86400000);
+    const diff24 = price24hAgo !== null ? percentDiff(h.now, price24hAgo) : "0.00";
     const signal = getSignal24h(h);
     const isBigDrop = BIG_DROPS.includes(item);
     const iconUrl = getItemIconUrl(item);
@@ -764,24 +784,44 @@ function renderTable(history) {
     if (isBigDrop) row.classList.add('highlight');
     row.onclick = () => openModal(item, h);
     
-    row.innerHTML = `
-      <td style="display: flex; align-items: center; gap: 10px;">
-        <img src="${iconUrl}" alt="${item}" class="item-icon" onerror="this.src='https://via.placeholder.com/32?text=?'">
-        <span>${item}</span>
-      </td>
-      <td>${h.high ? h.high.toFixed(2) : '0'}</td>
-      <td>${h.low ? h.low.toFixed(2) : '0'}</td>
-      <td><strong>${h.now ? h.now.toFixed(2) : '0'}</strong></td>
-      <td class="${diff24 >= 0 ? 'green' : 'red'}">${diff24}%</td>
-      <td class="${signal.class}">${signal.text}</td>
-      <td>${h.volume || 0}</td>
-    `;
+    const itemCell = document.createElement('td');
+    itemCell.style.display = 'flex';
+    itemCell.style.alignItems = 'center';
+    itemCell.style.gap = '10px';
+    
+    const img = document.createElement('img');
+    img.src = iconUrl;
+    img.alt = item;
+    img.className = 'item-icon';
+    img.onerror = function() { 
+      this.src = 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20.4/assets/minecraft/textures/item/barrier.png';
+    };
+    
+    itemCell.appendChild(img);
+    itemCell.appendChild(document.createTextNode(item));
+    
+    row.appendChild(itemCell);
+    
+    const cells = [
+      h.high ? h.high.toFixed(2) : '0',
+      h.low ? h.low.toFixed(2) : '0',
+      `<strong>${h.now ? h.now.toFixed(2) : '0'}</strong>`,
+      `<span class="${diff24 >= 0 ? 'green' : 'red'}">${diff24}%</span>`,
+      `<span class="${signal.class}">${signal.text}</span>`,
+      h.volume || 0
+    ];
+    
+    cells.forEach(cell => {
+      const td = document.createElement('td');
+      td.innerHTML = cell;
+      row.appendChild(td);
+    });
     
     table.appendChild(row);
   });
   
-  document.getElementById('tableContainer').classList.add('visible');
-  filterTable(); // Filter anwenden, falls Suchbegriff vorhanden
+  document.getElementById('tableContainer')?.classList.add('visible');
+  filterTable();
 }
 
 function renderTopCards(history) {
@@ -795,9 +835,7 @@ function renderTopCards(history) {
   const spike = stats[0];
   const crash = [...stats].sort((a, b) => a.diff24 - b.diff24)[0];
   
-  // Kaufempfehlung: niedrigster Preis relativ zum 24h-High, aber mit Volumen > 0
   const invest = [...stats].filter(s => s.volume > 0).sort((a, b) => (a.now / a.high) - (b.now / b.high))[0];
-  // Verkaufsempfehlung: höchster Preis relativ zum 24h-Low
   const sell = [...stats].filter(s => s.volume > 0).sort((a, b) => (b.now / b.low) - (a.now / a.low))[0];
   
   document.getElementById("spike").innerHTML = spike ? 
@@ -823,13 +861,15 @@ function renderTicker(history) {
     `${s.item}: ${s.now.toFixed(2)} (${s.diff24 > 0 ? '+' : ''}${s.diff24.toFixed(1)}%)`
   ).join(' • ');
   
-  document.getElementById('tickerContent').innerHTML = tickerText;
+  document.getElementById('tickerContent').innerHTML = tickerText || "Keine Daten";
 }
 
-// Charts rendern (global)
+// Charts rendern
 let spikeChart, crashChart, bigDropChart, volumeChart;
 
 function renderCharts(history) {
+  if (!document.getElementById('spikeChart')) return;
+  
   const stats = Object.entries(history).map(([item, h]) => {
     const price24hAgo = getPriceBefore(h, 86400000);
     const diff24 = price24hAgo !== null ? ((h.now - price24hAgo) / price24hAgo * 100) : 0;
@@ -842,29 +882,30 @@ function renderCharts(history) {
 
   const spikeDatasets = topSpikes.map((d, i) => ({
     label: d.item,
-    data: d.history,
+    data: d.history || [],
     borderColor: `hsl(${i * 50}, 80%, 65%)`,
     backgroundColor: `hsla(${i * 50}, 80%, 65%, 0.1)`,
     fill: true,
-    tension: 0.4,
+    tension: 0.3,
     pointRadius: 2,
     borderWidth: 2
   }));
 
   const crashDatasets = topCrashes.map((d, i) => ({
     label: d.item,
-    data: d.history,
+    data: d.history || [],
     borderColor: `hsl(${i * 50 + 180}, 80%, 65%)`,
     backgroundColor: `hsla(${i * 50 + 180}, 80%, 65%, 0.1)`,
     fill: true,
-    tension: 0.4,
+    tension: 0.3,
     pointRadius: 2,
     borderWidth: 2
   }));
 
   const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
     parsing: { xAxisKey: 'x', yAxisKey: 'y' },
-    animation: { duration: 1000, easing: 'easeInOutQuart' },
     scales: {
       x: {
         type: 'time',
@@ -883,315 +924,13 @@ function renderCharts(history) {
     }
   };
 
-  const ctxSpike = document.getElementById('spikeChart').getContext('2d');
-  if (spikeChart) spikeChart.destroy();
-  spikeChart = new Chart(ctxSpike, {
-    type: 'line',
-    data: { datasets: spikeDatasets },
-    options: chartOptions
-  });
-
-  const ctxCrash = document.getElementById('crashChart').getContext('2d');
-  if (crashChart) crashChart.destroy();
-  crashChart = new Chart(ctxCrash, {
-    type: 'line',
-    data: { datasets: crashDatasets },
-    options: chartOptions
-  });
-
-  document.querySelectorAll('.chart-card').forEach(c => c.classList.add('visible'));
-}
-
-function renderBigDropCharts(history) {
-  const bigDropItems = Object.entries(history)
-    .filter(([item]) => BIG_DROPS.includes(item))
-    .map(([item, h]) => ({ item, ...h }))
-    .sort((a, b) => b.volume - a.volume)
-    .slice(0, 5);
-
-  if (bigDropItems.length === 0) return;
-
-  // Big Drop Preischart
-  const bigDropDatasets = bigDropItems.map((d, i) => ({
-    label: `${d.item} (Vol: ${d.volume})`,
-    data: d.history,
-    borderColor: `hsl(${i * 70 + 300}, 90%, 65%)`,
-    backgroundColor: `hsla(${i * 70 + 300}, 90%, 65%, 0.15)`,
-    fill: true,
-    tension: 0.3,
-    pointRadius: 3,
-    borderWidth: 3,
-    borderDash: i % 2 === 0 ? [] : [5, 5]
-  }));
-
-  const bigDropOptions = {
-    parsing: { xAxisKey: 'x', yAxisKey: 'y' },
-    animation: { duration: 1200, easing: 'easeInOutQuart' },
-    scales: {
-      x: {
-        type: 'time',
-        time: { unit: 'hour', displayFormats: { hour: 'HH:mm' } },
-        grid: { color: 'rgba(255,255,255,0.1)' },
-        ticks: { color: 'white' }
-      },
-      y: {
-        grid: { color: 'rgba(255,255,255,0.1)' },
-        ticks: { color: 'white' }
-      }
-    },
-    plugins: {
-      legend: { 
-        labels: { color: 'white', font: { size: 12 } },
-        position: 'top'
-      },
-      tooltip: { mode: 'index', intersect: false }
-    }
-  };
-
-  const ctxBigDrop = document.getElementById('bigDropChart').getContext('2d');
-  if (bigDropChart) bigDropChart.destroy();
-  bigDropChart = new Chart(ctxBigDrop, {
-    type: 'line',
-    data: { datasets: bigDropDatasets },
-    options: bigDropOptions
-  });
-
-  // Volumen Chart
-  const volumeData = {
-    labels: bigDropItems.map(d => d.item),
-    datasets: [{
-      label: 'Handelsvolumen (24h)',
-      data: bigDropItems.map(d => d.volume || Math.floor(Math.random() * 100 + 10)),
-      backgroundColor: bigDropItems.map((_, i) => `hsla(${i * 70 + 300}, 80%, 60%, 0.6)`),
-      borderColor: bigDropItems.map((_, i) => `hsl(${i * 70 + 300}, 80%, 70%)`),
-      borderWidth: 2
-    }]
-  };
-
-  const ctxVolume = document.getElementById('volumeChart').getContext('2d');
-  if (volumeChart) volumeChart.destroy();
-  volumeChart = new Chart(ctxVolume, {
-    type: 'bar',
-    data: volumeData,
-    options: {
-      scales: { y: { beginAtZero: true, ticks: { color: 'white' } } },
-      plugins: { legend: { labels: { color: 'white' } } }
-    }
-  });
-
-  document.getElementById('bigDropChartCard').classList.add('visible');
-  document.getElementById('volumeChartCard').classList.add('visible');
-}
-
-// ==================== MODAL FÜR ITEM-DETAIL ====================
-let modalChartInstance = null;
-
-function openModal(itemName, itemData) {
-  const modal = document.getElementById('itemModal');
-  document.getElementById('modalItemName').textContent = itemName;
-  document.getElementById('modalItemIcon').src = getItemIconUrl(itemName);
-  
-  // Statistiken
-  const price24hAgo = getPriceBefore(itemData, 86400000);
-  const diff24 = price24hAgo !== null ? percentDiff(itemData.now, price24hAgo) : 0;
-  const signal = getSignal24h(itemData);
-  
-  document.getElementById('modalStats').innerHTML = `
-    <div class="stat-item"><span class="stat-label">24h High</span><span class="stat-value">${itemData.high.toFixed(2)}</span></div>
-    <div class="stat-item"><span class="stat-label">24h Low</span><span class="stat-value">${itemData.low.toFixed(2)}</span></div>
-    <div class="stat-item"><span class="stat-label">Aktuell</span><span class="stat-value">${itemData.now.toFixed(2)}</span></div>
-    <div class="stat-item"><span class="stat-label">24h %</span><span class="stat-value ${diff24 >= 0 ? 'green' : 'red'}">${diff24}%</span></div>
-    <div class="stat-item"><span class="stat-label">Signal</span><span class="stat-value ${signal.class}">${signal.text}</span></div>
-    <div class="stat-item"><span class="stat-label">Volumen</span><span class="stat-value">${itemData.volume || 0}</span></div>
-  `;
-  
-  // Chart rendern
-  const ctx = document.getElementById('modalChart').getContext('2d');
-  if (modalChartInstance) modalChartInstance.destroy();
-  
-  modalChartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      datasets: [{
-        label: itemName,
-        data: itemData.history,
-        borderColor: '#00ffaa',
-        backgroundColor: 'rgba(0,255,170,0.1)',
-        fill: true,
-        tension: 0.4,
-        pointRadius: 2,
-        borderWidth: 2
-      }]
-    },
-    options: {
-      parsing: { xAxisKey: 'x', yAxisKey: 'y' },
-      scales: {
-        x: { type: 'time', time: { unit: 'hour' }, ticks: { color: 'white' } },
-        y: { ticks: { color: 'white' } }
-      },
-      plugins: { legend: { display: false } }
-    }
-  });
-  
-  modal.style.display = 'flex';
-}
-
-// Modal schließen
-document.querySelector('.close').onclick = function() {
-  document.getElementById('itemModal').style.display = 'none';
-};
-
-window.onclick = function(event) {
-  const modal = document.getElementById('itemModal');
-  if (event.target == modal) {
-    modal.style.display = 'none';
-  }
-};
-
-// ==================== API FETCH & UPDATE ====================
-async function fetchData() {
   try {
-    const res = await fetch(API);
-    const json = await res.json();
-    const orders = json.orders || [];
-    let history = loadHistory(); // bestehende Daten laden
-
-    orders.forEach(o => {
-      const item = o.item.itemId;
-      const price = o.itemPrice;
-      const timestamp = Date.now();
-      
-      if (!history[item]) {
-        history[item] = { 
-          high: price, 
-          low: price, 
-          now: price,
-          volume: 1,
-          history: []
-        };
-      } else {
-        if (price > history[item].high) history[item].high = price;
-        if (price < history[item].low) history[item].low = price;
-        history[item].now = price;
-        history[item].volume = (history[item].volume || 0) + 1;
-      }
-      
-      if (!history[item].history) history[item].history = [];
-      history[item].history.push({ x: timestamp, y: price });
-      if (history[item].history.length > 200) history[item].history.shift();
+    const ctxSpike = document.getElementById('spikeChart').getContext('2d');
+    if (spikeChart) spikeChart.destroy();
+    spikeChart = new Chart(ctxSpike, {
+      type: 'line',
+      data: { datasets: spikeDatasets },
+      options: chartOptions
     });
 
-    saveHistory(history);
-    
-    renderTable(history);
-    renderTopCards(history);
-    renderCharts(history);
-    renderBigDropCharts(history);
-    renderTicker(history);
-    
-    // Falls Modal offen ist, aktualisieren
-    const modal = document.getElementById('itemModal');
-    if (modal.style.display === 'flex') {
-      const itemName = document.getElementById('modalItemName').textContent;
-      if (history[itemName]) {
-        openModal(itemName, history[itemName]);
-      }
-    }
-    
-  } catch (e) {
-    console.log("API Error, verwende Demo-Daten", e);
-    let history = loadHistory();
-    if (Object.keys(history).length === 0) {
-      history = { ...generateDemoData(), ...generateBigDropDemoData() };
-      saveHistory(history);
-    }
-    renderTable(history);
-    renderTopCards(history);
-    renderCharts(history);
-    renderBigDropCharts(history);
-    renderTicker(history);
-  }
-}
-
-// ==================== SOFORTIGES LADEN ====================
-let initialHistory = loadHistory();
-if (Object.keys(initialHistory).length > 0) {
-  renderTable(initialHistory);
-  renderTopCards(initialHistory);
-  renderCharts(initialHistory);
-  renderBigDropCharts(initialHistory);
-  renderTicker(initialHistory);
-} else {
-  initialHistory = { ...generateDemoData(), ...generateBigDropDemoData() };
-  renderTable(initialHistory);
-  renderTopCards(initialHistory);
-  renderCharts(initialHistory);
-  renderBigDropCharts(initialHistory);
-  renderTicker(initialHistory);
-}
-
-fetchData();
-setInterval(fetchData, 60000);
-
-// Reset um Mitternacht
-setInterval(() => {
-  const now = new Date();
-  if (now.getHours() === 0 && now.getMinutes() === 0) resetData();
-}, 60000);
-
-// ==================== HINTERGRUND-ANIMATION ====================
-const bgCanvas = document.getElementById('backgroundCanvas');
-const ctxBg = bgCanvas.getContext('2d');
-bgCanvas.width = window.innerWidth;
-bgCanvas.height = window.innerHeight;
-
-let points = [];
-for (let i = 0; i < 150; i++) {
-  points.push({
-    x: Math.random() * bgCanvas.width,
-    y: Math.random() * bgCanvas.height,
-    r: Math.random() * 3 + 1,
-    speed: Math.random() * 0.3 + 0.1,
-    angle: Math.random() * Math.PI * 2
-  });
-}
-
-function animateBackground() {
-  ctxBg.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
-  
-  points.forEach(p => {
-    p.x += Math.sin(p.angle) * p.speed;
-    p.y += Math.cos(p.angle) * p.speed;
-    p.angle += 0.01;
-    
-    if (p.x < 0 || p.x > bgCanvas.width) p.angle += Math.PI;
-    if (p.y < 0 || p.y > bgCanvas.height) p.angle += Math.PI;
-    
-    ctxBg.beginPath();
-    ctxBg.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    ctxBg.fillStyle = `rgba(100, 200, 255, ${p.r * 0.1})`;
-    ctxBg.fill();
-  });
-  
-  requestAnimationFrame(animateBackground);
-}
-animateBackground();
-
-window.addEventListener('resize', () => {
-  bgCanvas.width = window.innerWidth;
-  bgCanvas.height = window.innerHeight;
-});
-
-// Scroll-Animation
-function animateElements() {
-  document.querySelectorAll('.card, .table-container, .chart-card').forEach(el => {
-    if (el.getBoundingClientRect().top < window.innerHeight - 50) {
-      el.classList.add('visible');
-    }
-  });
-}
-window.addEventListener('scroll', animateElements);
-animateElements();
-</script>
-</body>
-</html>
+    const ctxCrash = document.getElementById('
