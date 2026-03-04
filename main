@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DonutSMP Market Tracker</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #0b0f1a;
+    color: white;
+    overflow-x: hidden;
+}
+
+h1 {
+    text-align: center;
+    padding: 20px;
+    font-size: 32px;
+}
+
+.container {
+    width: 90%;
+    max-width: 1200px;
+    margin: auto;
+}
+
+.cards {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+}
+
+.card {
+    background: rgba(255,255,255,0.05);
+    padding: 20px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    min-width: 250px;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(255,255,255,0.05);
+}
+
+.card h2 {
+    margin-bottom: 10px;
+}
+
+.green { color: #00ffae; }
+.red { color: #ff4d4d; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+th, td {
+    padding: 12px;
+    text-align: left;
+}
+
+th {
+    background: rgba(255,255,255,0.1);
+}
+
+tr:nth-child(even) {
+    background: rgba(255,255,255,0.03);
+}
+
+.snowflake {
+    position: fixed;
+    top: -10px;
+    color: white;
+    font-size: 10px;
+    user-select: none;
+    pointer-events: none;
+    animation: fall linear infinite;
+}
+
+@keyframes fall {
+    to {
+        transform: translateY(110vh);
+    }
+}
+</style>
+</head>
+<body>
+
+<h1>❄ DonutSMP Market Tracker ❄</h1>
+
+<div class="container">
+
+<div class="cards">
+    <div class="card">
+        <h2>📉 Biggest Loser</h2>
+        <div id="loser">Loading...</div>
+    </div>
+    <div class="card">
+        <h2>📈 Biggest Gainer</h2>
+        <div id="gainer">Loading...</div>
+    </div>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Item</th>
+            <th>Price</th>
+            <th>Amount</th>
+        </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+</table>
+
+</div>
+
+<script>
+const API_URL = "https://api.donut.auction/orders";
+
+async function fetchData() {
+    try {
+        const res = await fetch(API_URL);
+        const data = await res.json();
+
+        const orders = data.orders || data || [];
+
+        if (!orders.length) return;
+
+        // Sort by price ascending
+        const sorted = [...orders].sort((a, b) => a.itemPrice - b.itemPrice);
+
+        const loser = sorted[0];
+        const gainer = sorted[sorted.length - 1];
+
+        document.getElementById("loser").innerHTML =
+            `<div class="red">${loser.item.itemId}</div>
+             <div>${loser.itemPrice.toLocaleString()}</div>`;
+
+        document.getElementById("gainer").innerHTML =
+            `<div class="green">${gainer.item.itemId}</div>
+             <div>${gainer.itemPrice.toLocaleString()}</div>`;
+
+        const tableBody = document.getElementById("tableBody");
+        tableBody.innerHTML = "";
+
+        sorted.slice(0, 50).forEach(order => {
+            const row = `
+                <tr>
+                    <td>${order.item.itemId}</td>
+                    <td>${order.itemPrice.toLocaleString()}</td>
+                    <td>${order.amountOrdered}</td>
+                </tr>
+            `;
+            tableBody.innerHTML += row;
+        });
+
+    } catch (err) {
+        console.error("API Error:", err);
+    }
+}
+
+fetchData();
+setInterval(fetchData, 600000); // refresh every 10 minutes
+
+// Snow effect
+function createSnowflakes() {
+    for (let i = 0; i < 100; i++) {
+        const snowflake = document.createElement("div");
+        snowflake.classList.add("snowflake");
+        snowflake.innerHTML = "❄";
+        snowflake.style.left = Math.random() * 100 + "vw";
+        snowflake.style.animationDuration = (Math.random() * 5 + 5) + "s";
+        snowflake.style.opacity = Math.random();
+        snowflake.style.fontSize = Math.random() * 10 + 10 + "px";
+        document.body.appendChild(snowflake);
+    }
+}
+
+createSnowflakes();
+</script>
+
+</body>
+</html>
