@@ -5,86 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>❄ DonutSMP Market Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/luxon"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
 <style>
-body {
-  margin:0;
-  font-family:Arial, sans-serif;
-  background:#0b0f1a;
-  color:white;
-  overflow-x:hidden;
-  position:relative;
-}
+body{margin:0;font-family:Arial,sans-serif;background:#0b0f1a;color:white;overflow-x:hidden;position:relative;}
 h1{text-align:center;padding:20px;}
 .container{width:95%;margin:auto;}
-.cards {
-  display:flex;
-  gap:20px;
-  justify-content:center;
-  flex-wrap:wrap;
-  margin-bottom:20px;
-}
-.card {
-  background:rgba(255,255,255,0.05);
-  padding:20px;
-  border-radius:12px;
-  backdrop-filter:blur(10px);
-  min-width:260px;
-  text-align:center;
-  box-shadow:0 0 15px rgba(255,255,255,0.05);
-  transition: transform 0.4s, opacity 0.6s;
-  opacity:0;
-}
-.card.visible{opacity:1; transform:translateY(0);}
-.card.initial{transform:translateY(20px);}
-table {
-  width:100%;
-  border-collapse:collapse;
-  background:rgba(255,255,255,0.05);
-  border-radius:10px;
-  overflow:hidden;
-  margin-bottom:30px;
-  opacity:0;
-  transition:opacity 0.8s;
-}
+.cards{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin-bottom:20px;}
+.card{background:rgba(255,255,255,0.05);padding:20px;border-radius:12px;backdrop-filter:blur(10px);min-width:260px;text-align:center;box-shadow:0 0 15px rgba(255,255,255,0.05);transition: transform 0.4s, opacity 0.6s;opacity:0;transform:translateY(20px);}
+.card.visible{opacity:1;transform:translateY(0);}
+table{width:100%;border-collapse:collapse;background:rgba(255,255,255,0.05);border-radius:10px;overflow:hidden;margin-bottom:30px;opacity:0;transition:opacity 0.8s;}
 table.visible{opacity:1;}
 th,td{padding:10px;text-align:left;}
 th{background:rgba(255,255,255,0.1);}
 tr:nth-child(even){background:rgba(255,255,255,0.03);}
 .green{color:#00ffae;}
 .red{color:#ff4d4d;}
-button{
-  background:#111827;
-  color:white;
-  border:1px solid rgba(255,255,255,0.1);
-  padding:8px 12px;
-  border-radius:6px;
-  cursor:pointer;
-  margin-bottom:15px;
-  transition: background 0.3s;
-}
+button{background:#111827;color:white;border:1px solid rgba(255,255,255,0.1);padding:8px 12px;border-radius:6px;cursor:pointer;margin-bottom:15px;transition:background 0.3s;}
 button:hover{background:#1f2937;}
-canvas{
-  background:rgba(255,255,255,0.05);
-  border-radius:12px;
-  display:block;
-  margin:auto;
-  max-width:100%;
-  margin-top:30px;
-  opacity:0;
-  transition:opacity 0.8s;
-}
+canvas{background:rgba(255,255,255,0.05);border-radius:12px;display:block;margin:auto;max-width:100%;margin-top:30px;opacity:0;transition:opacity 0.8s;}
 canvas.visible{opacity:1;}
-#backgroundCanvas{
-  position:fixed;
-  top:0;
-  left:0;
-  width:100vw;
-  height:100vh;
-  z-index:-1;
-}
-@media(max-width:600px){
-  .cards{flex-direction:column;align-items:center;}
-}
+#backgroundCanvas{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;}
+@media(max-width:600px){.cards{flex-direction:column;align-items:center;}}
 </style>
 </head>
 <body>
@@ -93,18 +35,20 @@ canvas.visible{opacity:1;}
 <h1>❄ DonutSMP Market Dashboard</h1>
 
 <div class="container">
-  <div style="text-align:center;">
-    <button onclick="resetData()">Reset Tagesdaten</button>
-  </div>
+  <div style="text-align:center;"><button onclick="resetData()">Reset Tagesdaten</button></div>
 
   <div class="cards">
-    <div class="card initial">
+    <div class="card" id="spikeCard">
       <h3>🔥 Biggest Spike (10 → Now)</h3>
       <div id="spike">-</div>
     </div>
-    <div class="card initial">
+    <div class="card" id="crashCard">
       <h3>📉 Biggest Crash (10 → Now)</h3>
       <div id="crash">-</div>
+    </div>
+    <div class="card" id="investCard">
+      <h3>💰 Investment Empfehlung</h3>
+      <div id="invest">-</div>
     </div>
   </div>
 
@@ -128,11 +72,13 @@ canvas.visible{opacity:1;}
 
 <script>
 const API="https://api.donut.auction/orders";
-const STORAGE_KEY="donut_dashboard_v1";
+const STORAGE_KEY="donut_dashboard_v2";
 
 function loadHistory(){return JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}");}
 function saveHistory(data){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}
 function resetData(){localStorage.removeItem(STORAGE_KEY); location.reload();}
+
+function percentDiff(current,old){if(!old) return 0; return ((current-old)/old*100).toFixed(2);}
 
 async function fetchData(){
   try{
@@ -145,10 +91,7 @@ async function fetchData(){
     orders.forEach(o=>{
       const item=o.item.itemId;
       const price=o.itemPrice;
-
-      if(!history[item]){
-        history[item]={high:price, low:price, at10:null, at20:null, now:price, history:[]};
-      }
+      if(!history[item]) history[item]={high:price,low:price,at10:null,at20:null,now:price,history:[]};
       if(price>history[item].high) history[item].high=price;
       if(price<history[item].low) history[item].low=price;
       if(hour===10 && !history[item].at10) history[item].at10=price;
@@ -160,21 +103,18 @@ async function fetchData(){
     saveHistory(history);
     renderTable(history);
     renderCharts(history);
+    renderTopCards(history);
     animateElements();
   }catch(e){console.log("API Error",e);}
 }
 
-function percentDiff(current,old){if(!old) return 0; return ((current-old)/old*100).toFixed(2);}
-
 function renderTable(history){
   const table=document.getElementById("tableBody");
   table.innerHTML="";
-  let stats=[];
   for(const item in history){
     const h=history[item];
     const diff10=percentDiff(h.now,h.at10);
     const diff20=percentDiff(h.now,h.at20);
-    stats.push({item,diff10:parseFloat(diff10),...h});
     table.innerHTML+=`
       <tr>
         <td>${item}</td>
@@ -185,12 +125,21 @@ function renderTable(history){
         <td class="${diff20>=0?'green':'red'}">${diff20}%</td>
       </tr>`;
   }
-  if(stats.length>0){
-    const spike=[...stats].sort((a,b)=>b.diff10-a.diff10)[0];
-    const crash=[...stats].sort((a,b)=>a.diff10-b.diff10)[0];
-    document.getElementById("spike").innerHTML=spike?`${spike.item} (${spike.diff10}%)`:"-";
-    document.getElementById("crash").innerHTML=crash?`${crash.item} (${crash.diff10}%)`:"-";
-  }
+  document.getElementById('marketTable').classList.add('visible');
+}
+
+function renderTopCards(history){
+  const stats=Object.entries(history).map(([item,h])=>({item,...h,diff10:percentDiff(h.now,h.at10)}));
+  stats.sort((a,b)=>b.diff10-a.diff10);
+  const spike=stats[0], crash=[...stats].sort((a,b)=>a.diff10-b.diff10)[0];
+  document.getElementById("spike").innerText=spike?`${spike.item} (${spike.diff10}%)`:"-";
+  document.getElementById("crash").innerText=crash?`${crash.item} (${crash.diff10}%)`:"-";
+  // Investment Empfehlung: niedrigster Preis im Vergleich zum Tages-High
+  const investable=[...stats].sort((a,b)=>a.now/a.high - b.now/b.high)[0];
+  document.getElementById("invest").innerText=investable?`${investable.item} (jetzt günstig)`:"-";
+  document.getElementById("spikeCard").classList.add('visible');
+  document.getElementById("crashCard").classList.add('visible');
+  document.getElementById("investCard").classList.add('visible');
 }
 
 let spikeChart, crashChart;
@@ -200,87 +149,42 @@ function renderCharts(history){
   const topSpikes=stats.slice(0,5);
   const topCrashes=stats.slice(-5);
 
-  const spikeDatasets=topSpikes.map(d=>{
-    return {label:d.item,data:d.history.map(h=>({x:h.time,y:h.price})),borderColor:'hsl(' + Math.random()*360 + ',100%,60%)',fill:false,tension:0.3};
-  });
-  const crashDatasets=topCrashes.map(d=>{
-    return {label:d.item,data:d.history.map(h=>({x:h.time,y:h.price})),borderColor:'hsl(' + Math.random()*360 + ',100%,60%)',fill:false,tension:0.3};
-  });
+  const spikeDatasets=topSpikes.map(d=>({label:d.item,data:d.history.map(h=>({x:h.time,y:h.price})),borderColor:`hsl(${Math.random()*360},100%,60%)`,fill:false,tension:0.3}));
+  const crashDatasets=topCrashes.map(d=>({label:d.item,data:d.history.map(h=>({x:h.time,y:h.price})),borderColor:`hsl(${Math.random()*360},100%,60%)`,fill:false,tension:0.3}));
 
   const ctxSpike=document.getElementById('spikeChart').getContext('2d');
   if(spikeChart) spikeChart.destroy();
-  spikeChart=new Chart(ctxSpike,{
-    type:'line',
-    data:{datasets:spikeDatasets},
-    options:{
-      parsing:{xAxisKey:'x',yAxisKey:'y'},
-      animation:{duration:800},
-      scales:{x:{type:'time',time:{unit:'minute'},ticks:{color:'white'}},y:{ticks:{color:'white'}}},
-      plugins:{legend:{labels:{color:'white'}}}
-    }
-  });
-
+  spikeChart=new Chart(ctxSpike,{type:'line',data:{datasets:spikeDatasets},options:{parsing:{xAxisKey:'x',yAxisKey:'y'},animation:{duration:800},scales:{x:{type:'time',time:{unit:'minute'},ticks:{color:'white'}},y:{ticks:{color:'white'}}},plugins:{legend:{labels:{color:'white'}}}}});
   const ctxCrash=document.getElementById('crashChart').getContext('2d');
   if(crashChart) crashChart.destroy();
-  crashChart=new Chart(ctxCrash,{
-    type:'line',
-    data:{datasets:crashDatasets},
-    options:{
-      parsing:{xAxisKey:'x',yAxisKey:'y'},
-      animation:{duration:800},
-      scales:{x:{type:'time',time:{unit:'minute'},ticks:{color:'white'}},y:{ticks:{color:'white'}}},
-      plugins:{legend:{labels:{color:'white'}}}
-    }
-  });
+  crashChart=new Chart(ctxCrash,{type:'line',data:{datasets:crashDatasets},options:{parsing:{xAxisKey:'x',yAxisKey:'y'},animation:{duration:800},scales:{x:{type:'time',time:{unit:'minute'},ticks:{color:'white'}},y:{ticks:{color:'white'}}},plugins:{legend:{labels:{color:'white'}}}}});
+
+  document.getElementById('spikeChart').classList.add('visible');
+  document.getElementById('crashChart').classList.add('visible');
 }
 
-// Animation beim Scrollen
+// Scroll Animation
 function animateElements(){
-  document.querySelectorAll('.card.initial').forEach(el=>{
-    if(el.getBoundingClientRect().top < window.innerHeight - 50) el.classList.add('visible');
-  });
-  if(document.getElementById('marketTable').getBoundingClientRect().top < window.innerHeight - 50){
-    document.getElementById('marketTable').classList.add('visible');
-  }
-  document.querySelectorAll('canvas').forEach(c=>{
-    if(c.getBoundingClientRect().top < window.innerHeight - 50) c.classList.add('visible');
-  });
+  document.querySelectorAll('.card').forEach(el=>{if(el.getBoundingClientRect().top<window.innerHeight-50) el.classList.add('visible');});
+  document.querySelectorAll('canvas').forEach(c=>{if(c.getBoundingClientRect().top<window.innerHeight-50) c.classList.add('visible');});
 }
 window.addEventListener('scroll', animateElements);
-
-// Fetch jede Minute
-fetchData();
-setInterval(fetchData,60000);
-
-// Reset um Mitternacht
-setInterval(()=>{
-  const now=new Date();
-  if(now.getHours()===0 && now.getMinutes()===0) resetData();
-},60000);
 
 // Hintergrundpunkte
 const canvas=document.getElementById('backgroundCanvas');
 const ctx=canvas.getContext('2d');
 canvas.width=window.innerWidth; canvas.height=window.innerHeight;
 let points=[];
-for(let i=0;i<200;i++){
-  points.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*2+1,speed:Math.random()*0.5+0.2});
-}
-function animateBackground(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  points.forEach(p=>{
-    p.y+=p.speed;
-    if(p.y>canvas.height) p.y=0;
-    ctx.beginPath();
-    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-    ctx.fillStyle='white';
-    ctx.fill();
-  });
-  requestAnimationFrame(animateBackground);
-}
+for(let i=0;i<200;i++){points.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*2+1,speed:Math.random()*0.5+0.2});}
+function animateBackground(){ctx.clearRect(0,0,canvas.width,canvas.height);points.forEach(p=>{p.y+=p.speed;if(p.y>canvas.height)p.y=0;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='white';ctx.fill();});requestAnimationFrame(animateBackground);}
 animateBackground();
-window.addEventListener('resize',()=>{canvas.width=window.innerWidth; canvas.height=window.innerHeight;});
-</script>
+window.addEventListener('resize',()=>{canvas.width=window.innerWidth;canvas.height=window.innerHeight;});
 
+// Fetch jede Minute
+fetchData();
+setInterval(fetchData,60000);
+// Reset um Mitternacht
+setInterval(()=>{const now=new Date();if(now.getHours()===0 && now.getMinutes()===0) resetData();},60000);
+</script>
 </body>
 </html>
