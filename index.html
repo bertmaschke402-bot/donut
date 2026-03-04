@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>❄ DonutSMP Market Tracker</title>
+<style>
+  body{
+    margin:0;
+    font-family: Arial, sans-serif;
+    background:#0b0f1a;
+    color:white;
+    overflow-x:hidden;
+  }
+  h1{text-align:center;padding:20px;}
+  .container{width:95%;margin:auto;}
+  .cards{
+    display:flex;
+    gap:20px;
+    justify-content:center;
+    flex-wrap:wrap;
+    margin-bottom:20px;
+  }
+  .card{
+    background:rgba(255,255,255,0.05);
+    padding:20px;
+    border-radius:12px;
+    backdrop-filter:blur(10px);
+    min-width:260px;
+    text-align:center;
+    box-shadow:0 0 15px rgba(255,255,255,0.05);
+    transition: transform 0.3s;
+  }
+  .card:hover{transform: scale(1.05);}
+  table{
+    width:100%;
+    border-collapse:collapse;
+    background:rgba(255,255,255,0.05);
+    border-radius:10px;
+    overflow:hidden;
+  }
+  th,td{padding:10px;text-align:left;}
+  th{background:rgba(255,255,255,0.1);}
+  tr:nth-child(even){background:rgba(255,255,255,0.03);}
+  .green{color:#00ffae;}
+  .red{color:#ff4d4d;}
+  button{
+    background:#111827;
+    color:white;
+    border:1px solid rgba(255,255,255,0.1);
+    padding:8px 12px;
+    border-radius:6px;
+    cursor:pointer;
+    margin-bottom:15px;
+    transition: background 0.3s;
+  }
+  button:hover{background:#1f2937;}
+  .snowflake{
+    position:fixed;
+    top:-10px;
+    color:white;
+    pointer-events:none;
+    animation:fall linear infinite;
+  }
+  @keyframes fall{
+    to{transform:translateY(110vh);}
+  }
+  @media(max-width:600px){
+    .cards{flex-direction:column;align-items:center;}
+  }
+</style>
+</head>
+<body>
+
+<h1>❄ DonutSMP Market Tracker ❄</h1>
+
+<div class="container">
+
+  <div style="text-align:center;">
+    <button onclick="resetData()">Reset Tagesdaten</button>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <h3>🔥 Biggest Spike (10 → Now)</h3>
+      <div id="spike">-</div>
+    </div>
+    <div class="card">
+      <h3>📉 Biggest Crash (10 → Now)</h3>
+      <div id="crash">-</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>High</th>
+        <th>Low</th>
+        <th>Now</th>
+        <th>10→Now %</th>
+        <th>20→Now %</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+
+</div>
+
+<script>
+const API="https://api.donut.auction/orders";
+const STORAGE_KEY="donut_history_v2";
+
+function loadHistory(){return JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}");}
+function saveHistory(data){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}
+function resetData(){localStorage.removeItem(STORAGE_KEY); location.reload();}
+
+async function fetchData(){
+  try{
+    const res=await fetch(API);
+    const json=await res.json();
+    const orders=json.orders||json||[];
+    const now=Date.now();
+    const hour=new Date().getHours();
+    let history=loadHistory();
+
+    orders.forEach(o=>{
+      const item=o.item.itemId;
+      const price=o.itemPrice;
+
+      if(!history[item]){
+        history[item]={high:price, low:price, at10:null, at20:null, now:price};
+      }
+
+      if(price>history[item].high) history[item].high=price;
+      if(price<history[item].low) history[item].low=price;
+
+      if(hour===10 && !history[item].at10) history[item].at10=price;
+      if(hour===20 && !history[item].at20) history[item].at20=price;
+
+      history[item].now=price;
+    });
+
+    saveHistory(history);
+    render(history);
+  }catch(e){console.log("API Error",e);}
+}
+
+function percentDiff(current,old){if(!old) return 0; return ((current-old)/old*100).toFixed(2);}
+function render(history){
+  const table=document.getElementById("tableBody");
+  table.innerHTML="";
+  let stats=[];
+
+  for(const item in history){
+    const h=history[item];
+    const diff10=percentDiff(h.now,h.at10);
+    const diff20=percentDiff(h.now,h.at20);
+    stats.push({item,diff10:parseFloat(diff10),...h});
+    table.innerHTML+=`
+      <tr>
+        <td>${item}</td>
+        <td>${h.high}</td>
+        <td>${h.low}</td>
+        <td>${h.now}</td>
+        <td class="${diff10>=0?'green':'red'}">${diff10}%</td>
+        <td class="${diff20>=0?'green':'red'}">${diff20}%</td>
+      </tr>`;
+  }
+
+  if(stats.length>0){
+    const spike=[...stats].sort((a,b)=>b.diff10-a.diff10)[0];
+    const crash=[...stats].sort((a,b)=>a.diff10-b.diff10)[0];
+    document.getElementById("spike").innerHTML=spike?`${spike.item} (${spike.diff10}%)`:"-";
+    document.getElementById("crash").innerHTML=crash?`${crash.item} (${crash.diff10}%)`:"-";
+  }
+}
+
+fetchData();
+setInterval(fetchData,600000);
+
+// Auto Reset um Mitternacht
+setInterval(()=>{
+  const now=new Date();
+  if(now.getHours()===0 && now.getMinutes()===0) resetData();
+},60000);
+
+// Schneeflocken
+function snow(){
+  for(let i=0;i<120;i++){
+    const s=document.createElement("div");
+    s.className="snowflake";
+    s.innerHTML="❄";
+    s.style.left=Math.random()*100+"vw";
+    s.style.animationDuration=(5+Math.random()*6)+"s";
+    s.style.opacity=Math.random();
+    s.style.fontSize=(10+Math.random()*18)+"px";
+    document.body.appendChild(s);
+  }
+}
+snow();
+</script>
+
+</body>
+</html>
