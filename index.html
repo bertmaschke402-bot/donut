@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>❄ DonutSMP Market Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   body{
     margin:0;
@@ -11,6 +12,7 @@
     background:#0b0f1a;
     color:white;
     overflow-x:hidden;
+    position:relative;
   }
   h1{text-align:center;padding:20px;}
   .container{width:95%;margin:auto;}
@@ -55,15 +57,21 @@
     transition: background 0.3s;
   }
   button:hover{background:#1f2937;}
-  .snowflake{
-    position:fixed;
-    top:-10px;
-    color:white;
-    pointer-events:none;
-    animation:fall linear infinite;
+  canvas#dropChart{
+    background:rgba(255,255,255,0.05);
+    border-radius:12px;
+    display:block;
+    margin:auto;
+    max-width:100%;
+    margin-top:30px;
   }
-  @keyframes fall{
-    to{transform:translateY(110vh);}
+  #backgroundCanvas{
+    position:fixed;
+    top:0;
+    left:0;
+    width:100vw;
+    height:100vh;
+    z-index:-1;
   }
   @media(max-width:600px){
     .cards{flex-direction:column;align-items:center;}
@@ -72,7 +80,9 @@
 </head>
 <body>
 
-<h1>❄ DonutSMP Market Tracker ❄</h1>
+<canvas id="backgroundCanvas"></canvas>
+
+<h1>❄ DonutSMP Market Tracker</h1>
 
 <div class="container">
 
@@ -105,6 +115,8 @@
     <tbody id="tableBody"></tbody>
   </table>
 
+  <canvas id="dropChart" height="200"></canvas>
+
 </div>
 
 <script>
@@ -120,7 +132,6 @@ async function fetchData(){
     const res=await fetch(API);
     const json=await res.json();
     const orders=json.orders||json||[];
-    const now=Date.now();
     const hour=new Date().getHours();
     let history=loadHistory();
 
@@ -129,7 +140,7 @@ async function fetchData(){
       const price=o.itemPrice;
 
       if(!history[item]){
-        history[item]={high:price, low:price, at10:null, at20:null, now:price};
+        history[item]={high:price, low:price, at10:null, at20:null, now:price, history:[]};
       }
 
       if(price>history[item].high) history[item].high=price;
@@ -139,10 +150,12 @@ async function fetchData(){
       if(hour===20 && !history[item].at20) history[item].at20=price;
 
       history[item].now=price;
+      history[item].history.push({time:Date.now(),price});
     });
 
     saveHistory(history);
     render(history);
+    renderChart(history);
   }catch(e){console.log("API Error",e);}
 }
 
@@ -176,29 +189,70 @@ function render(history){
   }
 }
 
+// Chart für Biggest Crash
+let dropChart;
+function renderChart(history){
+  let stats=Object.entries(history).map(([item,h])=>({item,...h,diff10:percentDiff(h.now,h.at10)}));
+  stats.sort((a,b)=>a.diff10-b.diff10);
+  let topDrops = stats.slice(0,5); // Top 5 Crash Items
+
+  const datasets=topDrops.map(d=>{
+    return {
+      label:d.item,
+      data:d.history.map(h=>({x:h.time,y:h.price})),
+      borderColor:'hsl(' + Math.random()*360 + ', 100%, 60%)',
+      fill:false,
+      tension:0.3
+    }
+  });
+
+  const ctx=document.getElementById('dropChart').getContext('2d');
+  if(dropChart) dropChart.destroy();
+  dropChart=new Chart(ctx,{
+    type:'line',
+    data:{datasets},
+    options:{
+      parsing:{xAxisKey:'x',yAxisKey:'y'},
+      animation:false,
+      scales:{
+        x:{type:'time',time:{unit:'hour'}, ticks:{color:'white'}},
+        y:{ticks:{color:'white'}}
+      },
+      plugins:{legend:{labels:{color:'white'}}}
+    }
+  });
+}
+
 fetchData();
 setInterval(fetchData,600000);
-
-// Auto Reset um Mitternacht
 setInterval(()=>{
   const now=new Date();
   if(now.getHours()===0 && now.getMinutes()===0) resetData();
 },60000);
 
-// Schneeflocken
-function snow(){
-  for(let i=0;i<120;i++){
-    const s=document.createElement("div");
-    s.className="snowflake";
-    s.innerHTML="❄";
-    s.style.left=Math.random()*100+"vw";
-    s.style.animationDuration=(5+Math.random()*6)+"s";
-    s.style.opacity=Math.random();
-    s.style.fontSize=(10+Math.random()*18)+"px";
-    document.body.appendChild(s);
-  }
+// Hintergrund Punkte (loop)
+const canvas=document.getElementById('backgroundCanvas');
+const ctx=canvas.getContext('2d');
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+let points=[];
+for(let i=0;i<200;i++){
+  points.push({x:Math.random()*canvas.width, y:Math.random()*canvas.height, r:Math.random()*2+1, speed:Math.random()*0.5+0.2});
 }
-snow();
+function animate(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  points.forEach(p=>{
+    p.y+=p.speed;
+    if(p.y>canvas.height) p.y=0;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle='white';
+    ctx.fill();
+  });
+  requestAnimationFrame(animate);
+}
+animate();
+window.addEventListener('resize',()=>{canvas.width=window.innerWidth; canvas.height=window.innerHeight;});
 </script>
 
 </body>
