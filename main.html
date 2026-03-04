@@ -1,92 +1,54 @@
 <!DOCTYPE html>
-<html lang="de">
+<html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>DonutSMP Market Tracker</title>
-
+<meta charset="UTF-8">
+<title>DonutSMP Tracker</title>
 <style>
-body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: #0b0f1a;
-    color: white;
-    overflow-x: hidden;
+body{
+    margin:0;
+    font-family:Arial;
+    background:#0b0f1a;
+    color:white;
+    overflow-x:hidden;
 }
-
-h1 {
-    text-align: center;
-    padding: 20px;
-    font-size: 32px;
+h1{text-align:center;padding:20px;}
+.container{width:95%;margin:auto;}
+.cards{
+    display:flex;
+    gap:20px;
+    justify-content:center;
+    flex-wrap:wrap;
+    margin-bottom:20px;
 }
-
-.container {
-    width: 90%;
-    max-width: 1200px;
-    margin: auto;
+.card{
+    background:rgba(255,255,255,0.05);
+    padding:20px;
+    border-radius:12px;
+    backdrop-filter:blur(10px);
+    min-width:250px;
+    text-align:center;
 }
-
-.cards {
-    display: flex;
-    gap: 20px;
-    justify-content: center;
-    margin-bottom: 30px;
-    flex-wrap: wrap;
+table{
+    width:100%;
+    border-collapse:collapse;
+    background:rgba(255,255,255,0.05);
 }
+th,td{padding:10px;}
+th{background:rgba(255,255,255,0.1);}
+tr:nth-child(even){background:rgba(255,255,255,0.03);}
+.green{color:#00ffae;}
+.red{color:#ff4d4d;}
 
-.card {
-    background: rgba(255,255,255,0.05);
-    padding: 20px;
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
-    min-width: 250px;
-    text-align: center;
-    box-shadow: 0 0 20px rgba(255,255,255,0.05);
+.snowflake{
+    position:fixed;
+    top:-10px;
+    color:white;
+    user-select:none;
+    pointer-events:none;
+    animation:fall linear infinite;
 }
-
-.card h2 {
-    margin-bottom: 10px;
-}
-
-.green { color: #00ffae; }
-.red { color: #ff4d4d; }
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: rgba(255,255,255,0.05);
-    backdrop-filter: blur(10px);
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-th, td {
-    padding: 12px;
-    text-align: left;
-}
-
-th {
-    background: rgba(255,255,255,0.1);
-}
-
-tr:nth-child(even) {
-    background: rgba(255,255,255,0.03);
-}
-
-.snowflake {
-    position: fixed;
-    top: -10px;
-    color: white;
-    font-size: 10px;
-    user-select: none;
-    pointer-events: none;
-    animation: fall linear infinite;
-}
-
-@keyframes fall {
-    to {
-        transform: translateY(110vh);
-    }
+@keyframes fall{
+    to{transform:translateY(110vh);}
 }
 </style>
 </head>
@@ -98,91 +60,140 @@ tr:nth-child(even) {
 
 <div class="cards">
     <div class="card">
-        <h2>📉 Biggest Loser</h2>
-        <div id="loser">Loading...</div>
+        <h3>🔥 Biggest Spike (10 → Now)</h3>
+        <div id="spike">Loading...</div>
     </div>
     <div class="card">
-        <h2>📈 Biggest Gainer</h2>
-        <div id="gainer">Loading...</div>
+        <h3>📉 Biggest Crash (10 → Now)</h3>
+        <div id="crash">Loading...</div>
     </div>
 </div>
 
 <table>
-    <thead>
-        <tr>
-            <th>Item</th>
-            <th>Price</th>
-            <th>Amount</th>
-        </tr>
-    </thead>
-    <tbody id="tableBody"></tbody>
+<thead>
+<tr>
+<th>Item</th>
+<th>High</th>
+<th>Low</th>
+<th>Now</th>
+<th>10→Now</th>
+<th>20→Now</th>
+</tr>
+</thead>
+<tbody id="tableBody"></tbody>
 </table>
 
 </div>
 
 <script>
-const API_URL = "https://api.donut.auction/orders";
+const API="https://api.donut.auction/orders";
+const STORAGE_KEY="donut_history";
 
-async function fetchData() {
-    try {
-        const res = await fetch(API_URL);
-        const data = await res.json();
+function loadHistory(){
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}");
+}
 
-        const orders = data.orders || data || [];
+function saveHistory(data){
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+}
 
-        if (!orders.length) return;
+async function fetchData(){
+    try{
+        const res=await fetch(API);
+        const json=await res.json();
+        const orders=json.orders||json||[];
+        const now=Date.now();
+        const hour=new Date().getHours();
 
-        // Sort by price ascending
-        const sorted = [...orders].sort((a, b) => a.itemPrice - b.itemPrice);
+        let history=loadHistory();
 
-        const loser = sorted[0];
-        const gainer = sorted[sorted.length - 1];
+        orders.forEach(o=>{
+            const item=o.item.itemId;
+            const price=o.itemPrice;
 
-        document.getElementById("loser").innerHTML =
-            `<div class="red">${loser.item.itemId}</div>
-             <div>${loser.itemPrice.toLocaleString()}</div>`;
+            if(!history[item]){
+                history[item]={
+                    prices:[],
+                    high:price,
+                    low:price,
+                    at10:null,
+                    at20:null
+                };
+            }
 
-        document.getElementById("gainer").innerHTML =
-            `<div class="green">${gainer.item.itemId}</div>
-             <div>${gainer.itemPrice.toLocaleString()}</div>`;
+            history[item].prices.push({price,timestamp:now});
 
-        const tableBody = document.getElementById("tableBody");
-        tableBody.innerHTML = "";
+            if(price>history[item].high)history[item].high=price;
+            if(price<history[item].low)history[item].low=price;
 
-        sorted.slice(0, 50).forEach(order => {
-            const row = `
-                <tr>
-                    <td>${order.item.itemId}</td>
-                    <td>${order.itemPrice.toLocaleString()}</td>
-                    <td>${order.amountOrdered}</td>
-                </tr>
-            `;
-            tableBody.innerHTML += row;
+            if(hour===10 && !history[item].at10)
+                history[item].at10=price;
+
+            if(hour===20 && !history[item].at20)
+                history[item].at20=price;
+
+            history[item].now=price;
         });
 
-    } catch (err) {
-        console.error("API Error:", err);
+        saveHistory(history);
+        render(history);
+
+    }catch(e){
+        console.log("API Error",e);
     }
+}
+
+function render(history){
+    const table=document.getElementById("tableBody");
+    table.innerHTML="";
+
+    let stats=[];
+
+    for(const item in history){
+        const h=history[item];
+        const diff10=h.at10? h.now-h.at10 : 0;
+        const diff20=h.at20? h.now-h.at20 : 0;
+
+        stats.push({item,...h,diff10,diff20});
+
+        table.innerHTML+=`
+        <tr>
+            <td>${item}</td>
+            <td>${h.high}</td>
+            <td>${h.low}</td>
+            <td>${h.now}</td>
+            <td class="${diff10>=0?'green':'red'}">${diff10}</td>
+            <td class="${diff20>=0?'green':'red'}">${diff20}</td>
+        </tr>`;
+    }
+
+    const spike=[...stats].sort((a,b)=>b.diff10-a.diff10)[0];
+    const crash=[...stats].sort((a,b)=>a.diff10-b.diff10)[0];
+
+    document.getElementById("spike").innerHTML=
+        spike?`${spike.item} (${spike.diff10})`:"-";
+
+    document.getElementById("crash").innerHTML=
+        crash?`${crash.item} (${crash.diff10})`:"-";
 }
 
 fetchData();
-setInterval(fetchData, 600000); // refresh every 10 minutes
+setInterval(fetchData,600000);
 
-// Snow effect
-function createSnowflakes() {
-    for (let i = 0; i < 100; i++) {
-        const snowflake = document.createElement("div");
-        snowflake.classList.add("snowflake");
-        snowflake.innerHTML = "❄";
-        snowflake.style.left = Math.random() * 100 + "vw";
-        snowflake.style.animationDuration = (Math.random() * 5 + 5) + "s";
-        snowflake.style.opacity = Math.random();
-        snowflake.style.fontSize = Math.random() * 10 + 10 + "px";
-        document.body.appendChild(snowflake);
+// snow
+function snow(){
+    for(let i=0;i<100;i++){
+        const s=document.createElement("div");
+        s.className="snowflake";
+        s.innerHTML="❄";
+        s.style.left=Math.random()*100+"vw";
+        s.style.animationDuration=(5+Math.random()*5)+"s";
+        s.style.opacity=Math.random();
+        s.style.fontSize=(10+Math.random()*15)+"px";
+        document.body.appendChild(s);
     }
 }
-
-createSnowflakes();
+snow();
 </script>
 
 </body>
