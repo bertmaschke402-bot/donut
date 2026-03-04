@@ -72,19 +72,19 @@ canvas.visible{opacity:1;}
 
 <script>
 const API="https://api.donut.auction/orders";
-const STORAGE_KEY="donut_dashboard_v2";
+const STORAGE_KEY="donut_dashboard_v3";
 
 function loadHistory(){return JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}");}
 function saveHistory(data){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}
 function resetData(){localStorage.removeItem(STORAGE_KEY); location.reload();}
-
 function percentDiff(current,old){if(!old) return 0; return ((current-old)/old*100).toFixed(2);}
 
+// Haupt-Funktion zum fetchen & rendern
 async function fetchData(){
   try{
     const res=await fetch(API);
     const json=await res.json();
-    const orders=json.orders||json||[];
+    const orders=json.orders||[];
     const hour=new Date().getHours();
     let history=loadHistory();
 
@@ -97,17 +97,19 @@ async function fetchData(){
       if(hour===10 && !history[item].at10) history[item].at10=price;
       if(hour===20 && !history[item].at20) history[item].at20=price;
       history[item].now=price;
-      history[item].history.push({time:Date.now(),price});
+      history[item].history.push({x:Date.now(),y:price});
+      if(history[item].history.length>100) history[item].history.shift(); // max 100 Punkte
     });
 
     saveHistory(history);
     renderTable(history);
-    renderCharts(history);
     renderTopCards(history);
+    renderCharts(history);
     animateElements();
   }catch(e){console.log("API Error",e);}
 }
 
+// Tabelle
 function renderTable(history){
   const table=document.getElementById("tableBody");
   table.innerHTML="";
@@ -128,13 +130,13 @@ function renderTable(history){
   document.getElementById('marketTable').classList.add('visible');
 }
 
+// Top Cards
 function renderTopCards(history){
   const stats=Object.entries(history).map(([item,h])=>({item,...h,diff10:percentDiff(h.now,h.at10)}));
   stats.sort((a,b)=>b.diff10-a.diff10);
   const spike=stats[0], crash=[...stats].sort((a,b)=>a.diff10-b.diff10)[0];
   document.getElementById("spike").innerText=spike?`${spike.item} (${spike.diff10}%)`:"-";
   document.getElementById("crash").innerText=crash?`${crash.item} (${crash.diff10}%)`:"-";
-  // Investment Empfehlung: niedrigster Preis im Vergleich zum Tages-High
   const investable=[...stats].sort((a,b)=>a.now/a.high - b.now/b.high)[0];
   document.getElementById("invest").innerText=investable?`${investable.item} (jetzt günstig)`:"-";
   document.getElementById("spikeCard").classList.add('visible');
@@ -142,6 +144,7 @@ function renderTopCards(history){
   document.getElementById("investCard").classList.add('visible');
 }
 
+// Charts
 let spikeChart, crashChart;
 function renderCharts(history){
   const stats=Object.entries(history).map(([item,h])=>({item,...h,diff10:percentDiff(h.now,h.at10)}));
@@ -149,12 +152,13 @@ function renderCharts(history){
   const topSpikes=stats.slice(0,5);
   const topCrashes=stats.slice(-5);
 
-  const spikeDatasets=topSpikes.map(d=>({label:d.item,data:d.history.map(h=>({x:h.time,y:h.price})),borderColor:`hsl(${Math.random()*360},100%,60%)`,fill:false,tension:0.3}));
-  const crashDatasets=topCrashes.map(d=>({label:d.item,data:d.history.map(h=>({x:h.time,y:h.price})),borderColor:`hsl(${Math.random()*360},100%,60%)`,fill:false,tension:0.3}));
+  const spikeDatasets=topSpikes.map(d=>({label:d.item,data:d.history,borderColor:`hsl(${Math.random()*360},100%,60%)`,fill:false,tension:0.3}));
+  const crashDatasets=topCrashes.map(d=>({label:d.item,data:d.history,borderColor:`hsl(${Math.random()*360},100%,60%)`,fill:false,tension:0.3}));
 
   const ctxSpike=document.getElementById('spikeChart').getContext('2d');
   if(spikeChart) spikeChart.destroy();
   spikeChart=new Chart(ctxSpike,{type:'line',data:{datasets:spikeDatasets},options:{parsing:{xAxisKey:'x',yAxisKey:'y'},animation:{duration:800},scales:{x:{type:'time',time:{unit:'minute'},ticks:{color:'white'}},y:{ticks:{color:'white'}}},plugins:{legend:{labels:{color:'white'}}}}});
+
   const ctxCrash=document.getElementById('crashChart').getContext('2d');
   if(crashChart) crashChart.destroy();
   crashChart=new Chart(ctxCrash,{type:'line',data:{datasets:crashDatasets},options:{parsing:{xAxisKey:'x',yAxisKey:'y'},animation:{duration:800},scales:{x:{type:'time',time:{unit:'minute'},ticks:{color:'white'}},y:{ticks:{color:'white'}}},plugins:{legend:{labels:{color:'white'}}}}});
