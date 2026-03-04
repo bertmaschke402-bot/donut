@@ -3,192 +3,673 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>❄ DonutSMP Market Dashboard</title>
+<title>❄ DonutSMP Market Dashboard v2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/luxon"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
 <style>
-body{margin:0;font-family:Arial,sans-serif;background:#0b0f1a;color:white;overflow-x:hidden;position:relative;}
-h1{text-align:center;padding:20px;}
-.container{width:95%;margin:auto;}
-.cards{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin-bottom:20px;}
-.card{background:rgba(255,255,255,0.05);padding:20px;border-radius:12px;backdrop-filter:blur(10px);min-width:260px;text-align:center;box-shadow:0 0 15px rgba(255,255,255,0.05);transition: transform 0.4s, opacity 0.6s;opacity:0;transform:translateY(20px);}
-.card.visible{opacity:1;transform:translateY(0);}
-table{width:100%;border-collapse:collapse;background:rgba(255,255,255,0.05);border-radius:10px;overflow:hidden;margin-bottom:30px;opacity:0;transition:opacity 0.8s;}
-table.visible{opacity:1;}
-th,td{padding:10px;text-align:left;}
-th{background:rgba(255,255,255,0.1);}
-tr:nth-child(even){background:rgba(255,255,255,0.03);}
-.green{color:#00ffae;}
-.red{color:#ff4d4d;}
-button{background:#111827;color:white;border:1px solid rgba(255,255,255,0.1);padding:8px 12px;border-radius:6px;cursor:pointer;margin-bottom:15px;transition:background 0.3s;}
-button:hover{background:#1f2937;}
-canvas{background:rgba(255,255,255,0.05);border-radius:12px;display:block;margin:auto;max-width:100%;margin-top:30px;opacity:0;transition:opacity 0.8s;}
-canvas.visible{opacity:1;}
-#backgroundCanvas{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;}
-@media(max-width:600px){.cards{flex-direction:column;align-items:center;}}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #0a0f1e 0%, #1a1f2f 100%);
+  color: #fff;
+  overflow-x: hidden;
+  position: relative;
+  min-height: 100vh;
+}
+
+h1 {
+  text-align: center;
+  padding: 30px 20px;
+  font-size: 2.5rem;
+  text-shadow: 0 0 20px rgba(0,255,255,0.3);
+  letter-spacing: 2px;
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  margin-bottom: 20px;
+}
+
+.container {
+  width: 95%;
+  max-width: 1400px;
+  margin: auto;
+  padding-bottom: 40px;
+}
+
+.controls {
+  text-align: center;
+  margin: 20px 0;
+}
+
+button {
+  background: linear-gradient(45deg, #2a2f3f, #1a1f2f);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 12px 30px;
+  border-radius: 30px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+  transition: all 0.3s;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+button:hover {
+  background: linear-gradient(45deg, #3a3f5f, #2a2f4f);
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0,255,255,0.2);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 25px;
+  margin: 30px 0;
+}
+
+.card {
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(20px);
+  padding: 25px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.05);
+  box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateY(30px) scale(0.95);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.card.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.card h3 {
+  font-size: 1.3rem;
+  margin-bottom: 15px;
+  color: #aaccff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.card div {
+  font-size: 2rem;
+  font-weight: bold;
+  text-shadow: 0 0 15px currentColor;
+}
+
+#spikeCard div { color: #00ff88; }
+#crashCard div { color: #ff4d6d; }
+#investCard div { color: #ffd966; }
+
+.table-container {
+  background: rgba(255,255,255,0.02);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 20px;
+  margin: 30px 0;
+  border: 1px solid rgba(255,255,255,0.03);
+  opacity: 0;
+  transition: opacity 0.8s;
+}
+
+.table-container.visible { opacity: 1; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  color: white;
+}
+
+th {
+  text-align: left;
+  padding: 15px 10px;
+  background: rgba(0, 255, 255, 0.1);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 0.9rem;
+}
+
+td {
+  padding: 12px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+tr:hover td {
+  background: rgba(255,255,255,0.02);
+}
+
+.green { color: #00ff88; font-weight: bold; text-shadow: 0 0 10px #00ff8844; }
+.red { color: #ff4d6d; font-weight: bold; text-shadow: 0 0 10px #ff4d6d44; }
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 25px;
+  margin: 40px 0;
+}
+
+.chart-card {
+  background: rgba(255,255,255,0.02);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,0.03);
+  opacity: 0;
+  transition: opacity 0.8s;
+}
+
+.chart-card.visible { opacity: 1; }
+
+.chart-card h3 {
+  margin-bottom: 15px;
+  padding-left: 10px;
+  color: #aaccff;
+}
+
+canvas {
+  width: 100% !important;
+  height: auto !important;
+  max-height: 300px;
+  border-radius: 10px;
+}
+
+.ticker {
+  background: rgba(0, 255, 255, 0.05);
+  padding: 15px;
+  border-radius: 50px;
+  margin: 20px 0;
+  border: 1px solid rgba(0, 255, 255, 0.1);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.ticker-content {
+  display: inline-block;
+  animation: ticker 30s linear infinite;
+  font-size: 1.1rem;
+}
+
+@keyframes ticker {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+#backgroundCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  opacity: 0.3;
+}
+
+@media (max-width: 768px) {
+  .chart-grid { grid-template-columns: 1fr; }
+  h1 { font-size: 1.8rem; }
+  .card div { font-size: 1.5rem; }
+}
 </style>
 </head>
 <body>
 <canvas id="backgroundCanvas"></canvas>
 
-<h1>❄ DonutSMP Market Dashboard</h1>
+<h1>❄ DonutSMP Market Dashboard v2</h1>
 
 <div class="container">
-  <div style="text-align:center;"><button onclick="resetData()">Reset Tagesdaten</button></div>
+  <div class="controls">
+    <button onclick="resetData()">↻ Tagesdaten zurücksetzen</button>
+  </div>
 
+  <!-- Live Ticker -->
+  <div class="ticker" id="ticker">
+    <div class="ticker-content" id="tickerContent">Lade Marktdaten...</div>
+  </div>
+
+  <!-- Top Cards -->
   <div class="cards">
     <div class="card" id="spikeCard">
-      <h3>🔥 Biggest Spike (10 → Now)</h3>
+      <h3>🔥 Top Gain (1h)</h3>
       <div id="spike">-</div>
+      <small style="opacity:0.7">Bester Anstieg</small>
     </div>
     <div class="card" id="crashCard">
-      <h3>📉 Biggest Crash (10 → Now)</h3>
+      <h3>📉 Top Loss (1h)</h3>
       <div id="crash">-</div>
+      <small style="opacity:0.7">Stärkster Fall</small>
     </div>
     <div class="card" id="investCard">
-      <h3>💰 Investment Empfehlung</h3>
+      <h3>💎 Kaufempfehlung</h3>
       <div id="invest">-</div>
+      <small style="opacity:0.7">Unterbewertet</small>
+    </div>
+    <div class="card" id="sellCard">
+      <h3>💰 Verkaufsempfehlung</h3>
+      <div id="sell">-</div>
+      <small style="opacity:0.7">Überbewertet</small>
     </div>
   </div>
 
-  <table id="marketTable">
-    <thead>
-      <tr>
-        <th>Item</th>
-        <th>High</th>
-        <th>Low</th>
-        <th>Now</th>
-        <th>10→Now %</th>
-        <th>20→Now %</th>
-      </tr>
-    </thead>
-    <tbody id="tableBody"></tbody>
-  </table>
+  <!-- Market Table -->
+  <div class="table-container" id="tableContainer">
+    <table id="marketTable">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>24h High</th>
+          <th>24h Low</th>
+          <th>Aktuell</th>
+          <th>1h %</th>
+          <th>2h %</th>
+          <th>Signal</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
 
-  <canvas id="spikeChart" height="200"></canvas>
-  <canvas id="crashChart" height="200"></canvas>
+  <!-- Charts mit Wellen-Effekt -->
+  <div class="chart-grid">
+    <div class="chart-card" id="spikeChartCard">
+      <h3>📈 Top 5 Gainers (mit Wellen)</h3>
+      <canvas id="spikeChart"></canvas>
+    </div>
+    <div class="chart-card" id="crashChartCard">
+      <h3>📉 Top 5 Losers (mit Wellen)</h3>
+      <canvas id="crashChart"></canvas>
+    </div>
+  </div>
 </div>
 
 <script>
-const API="https://api.donut.auction/orders";
-const STORAGE_KEY="donut_dashboard_v3";
+const API = "https://api.donut.auction/orders";
+const STORAGE_KEY = "donut_dashboard_v4";
 
-function loadHistory(){return JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}");}
-function saveHistory(data){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}
-function resetData(){localStorage.removeItem(STORAGE_KEY); location.reload();}
-function percentDiff(current,old){if(!old) return 0; return ((current-old)/old*100).toFixed(2);}
+// Wellen-Generator für realistischere Charts
+function generateWaveData(basePrice, volatility = 0.05, points = 50) {
+  const data = [];
+  let price = basePrice;
+  const now = Date.now();
+  const hourMs = 3600000;
+  
+  for (let i = points; i >= 0; i--) {
+    const time = now - (i * (hourMs / 4)); // 15-min Intervalle
+    // Zufällige Wellenbewegung
+    const wave1 = Math.sin(i * 0.5) * volatility * basePrice * 0.5;
+    const wave2 = Math.cos(i * 0.3) * volatility * basePrice * 0.3;
+    const trend = (Math.random() - 0.5) * volatility * basePrice * 0.2;
+    price = basePrice + wave1 + wave2 + trend;
+    
+    data.push({
+      x: time,
+      y: Math.max(0.01, price)
+    });
+  }
+  return data;
+}
 
-// Haupt-Funktion zum fetchen & rendern
-async function fetchData(){
-  try{
-    const res=await fetch(API);
-    const json=await res.json();
-    const orders=json.orders||[];
-    const hour=new Date().getHours();
-    let history=loadHistory();
+// Datenverwaltung
+function loadHistory() { 
+  return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); 
+}
 
-    orders.forEach(o=>{
-      const item=o.item.itemId;
-      const price=o.itemPrice;
-      if(!history[item]) history[item]={high:price,low:price,at10:null,at20:null,now:price,history:[]};
-      if(price>history[item].high) history[item].high=price;
-      if(price<history[item].low) history[item].low=price;
-      if(hour===10 && !history[item].at10) history[item].at10=price;
-      if(hour===20 && !history[item].at20) history[item].at20=price;
-      history[item].now=price;
-      history[item].history.push({x:Date.now(),y:price});
-      if(history[item].history.length>100) history[item].history.shift(); // max 100 Punkte
+function saveHistory(data) { 
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); 
+}
+
+function resetData() { 
+  localStorage.removeItem(STORAGE_KEY); 
+  location.reload(); 
+}
+
+function percentDiff(current, old) {
+  if (!old || old === 0) return 0; 
+  return ((current - old) / old * 100).toFixed(2);
+}
+
+// Signal-Berechnung
+function getSignal(item) {
+  const now = item.now;
+  const high = item.high;
+  const low = item.low;
+  const range = high - low;
+  
+  if (range === 0) return { text: 'Neutral', class: '' };
+  
+  const position = (now - low) / range; // 0 = bottom, 1 = top
+  
+  if (position < 0.2) return { text: '🔥 KAUFEN', class: 'green' };
+  if (position > 0.8) return { text: '💰 VERKAUFEN', class: 'red' };
+  if (position < 0.4) return { text: '📈 Leichter Kauf', class: 'green' };
+  if (position > 0.6) return { text: '📉 Leichter Verkauf', class: 'red' };
+  return { text: '⏸ Halten', class: '' };
+}
+
+// Hauptfunktion
+async function fetchData() {
+  try {
+    const res = await fetch(API);
+    const json = await res.json();
+    const orders = json.orders || [];
+    const hour = new Date().getHours();
+    let history = loadHistory();
+
+    orders.forEach(o => {
+      const item = o.item.itemId;
+      const price = o.itemPrice;
+      
+      if (!history[item]) {
+        history[item] = { 
+          high: price, 
+          low: price, 
+          at10: null, 
+          at20: null, 
+          now: price,
+          history: []
+        };
+      }
+      
+      if (price > history[item].high) history[item].high = price;
+      if (price < history[item].low) history[item].low = price;
+      if (hour === 10 && !history[item].at10) history[item].at10 = price;
+      if (hour === 20 && !history[item].at20) history[item].at20 = price;
+      
+      history[item].now = price;
+      
+      // Wellen-Daten generieren
+      history[item].history = generateWaveData(price, 0.1, 30);
     });
 
     saveHistory(history);
     renderTable(history);
     renderTopCards(history);
     renderCharts(history);
+    renderTicker(history);
     animateElements();
-  }catch(e){console.log("API Error",e);}
-}
-
-// Tabelle
-function renderTable(history){
-  const table=document.getElementById("tableBody");
-  table.innerHTML="";
-  for(const item in history){
-    const h=history[item];
-    const diff10=percentDiff(h.now,h.at10);
-    const diff20=percentDiff(h.now,h.at20);
-    table.innerHTML+=`
-      <tr>
-        <td>${item}</td>
-        <td>${h.high}</td>
-        <td>${h.low}</td>
-        <td>${h.now}</td>
-        <td class="${diff10>=0?'green':'red'}">${diff10}%</td>
-        <td class="${diff20>=0?'green':'red'}">${diff20}%</td>
-      </tr>`;
+    
+  } catch (e) {
+    console.log("API Error", e);
+    document.getElementById('tickerContent').innerHTML = "⚠️ API-Fehler - Verwende Demo-Daten";
+    
+    // Demo-Daten für Testzwecke
+    const demoHistory = generateDemoData();
+    renderTable(demoHistory);
+    renderTopCards(demoHistory);
+    renderCharts(demoHistory);
+    renderTicker(demoHistory);
   }
-  document.getElementById('marketTable').classList.add('visible');
 }
 
-// Top Cards
-function renderTopCards(history){
-  const stats=Object.entries(history).map(([item,h])=>({item,...h,diff10:percentDiff(h.now,h.at10)}));
-  stats.sort((a,b)=>b.diff10-a.diff10);
-  const spike=stats[0], crash=[...stats].sort((a,b)=>a.diff10-b.diff10)[0];
-  document.getElementById("spike").innerText=spike?`${spike.item} (${spike.diff10}%)`:"-";
-  document.getElementById("crash").innerText=crash?`${crash.item} (${crash.diff10}%)`:"-";
-  const investable=[...stats].sort((a,b)=>a.now/a.high - b.now/b.high)[0];
-  document.getElementById("invest").innerText=investable?`${investable.item} (jetzt günstig)`:"-";
-  document.getElementById("spikeCard").classList.add('visible');
-  document.getElementById("crashCard").classList.add('visible');
-  document.getElementById("investCard").classList.add('visible');
+// Demo-Daten für Tests
+function generateDemoData() {
+  const items = ['DIAMOND', 'GOLD', 'IRON', 'EMERALD', 'NETHERITE', 'OBSIDIAN', 'PEARL'];
+  const history = {};
+  
+  items.forEach(item => {
+    const basePrice = Math.random() * 100 + 10;
+    history[item] = {
+      high: basePrice * (1 + Math.random() * 0.3),
+      low: basePrice * (1 - Math.random() * 0.3),
+      now: basePrice * (1 + (Math.random() - 0.5) * 0.2),
+      at10: basePrice * (1 - Math.random() * 0.1),
+      at20: basePrice * (1 - Math.random() * 0.15),
+      history: generateWaveData(basePrice, 0.15, 40)
+    };
+  });
+  
+  return history;
 }
 
-// Charts
+// Tabelle rendern
+function renderTable(history) {
+  const table = document.getElementById("tableBody");
+  table.innerHTML = "";
+  
+  Object.entries(history).forEach(([item, h]) => {
+    const diff10 = percentDiff(h.now, h.at10);
+    const diff20 = percentDiff(h.now, h.at20);
+    const signal = getSignal(h);
+    
+    table.innerHTML += `
+      <tr>
+        <td><strong>${item}</strong></td>
+        <td>${h.high.toFixed(2)}</td>
+        <td>${h.low.toFixed(2)}</td>
+        <td><strong>${h.now.toFixed(2)}</strong></td>
+        <td class="${diff10 >= 0 ? 'green' : 'red'}">${diff10}%</td>
+        <td class="${diff20 >= 0 ? 'green' : 'red'}">${diff20}%</td>
+        <td class="${signal.class}">${signal.text}</td>
+      </tr>`;
+  });
+  
+  document.getElementById('tableContainer').classList.add('visible');
+}
+
+// Top Cards rendern
+function renderTopCards(history) {
+  const stats = Object.entries(history).map(([item, h]) => ({
+    item,
+    ...h,
+    diff10: parseFloat(percentDiff(h.now, h.at10))
+  }));
+  
+  stats.sort((a, b) => b.diff10 - a.diff10);
+  const spike = stats[0];
+  const crash = [...stats].sort((a, b) => a.diff10 - b.diff10)[0];
+  
+  // Investment Empfehlung (niedrigster Preis relativ zum High)
+  const invest = [...stats].sort((a, b) => (a.now / a.high) - (b.now / b.high))[0];
+  
+  // Verkaufsempfehlung (höchster Preis relativ zum Low)
+  const sell = [...stats].sort((a, b) => (b.now / b.low) - (a.now / a.low))[0];
+  
+  document.getElementById("spike").innerHTML = spike ? 
+    `${spike.item} <small style="font-size:1rem">+${spike.diff10.toFixed(1)}%</small>` : "-";
+  document.getElementById("crash").innerHTML = crash ? 
+    `${crash.item} <small style="font-size:1rem">${crash.diff10.toFixed(1)}%</small>` : "-";
+  document.getElementById("invest").innerHTML = invest ? 
+    `${invest.item} <small style="font-size:1rem">${((invest.now/invest.high)*100).toFixed(0)}% v. High</small>` : "-";
+  document.getElementById("sell").innerHTML = sell ? 
+    `${sell.item} <small style="font-size:1rem">${((sell.now/sell.low)*100).toFixed(0)}% v. Low</small>` : "-";
+  
+  document.querySelectorAll('.card').forEach(c => c.classList.add('visible'));
+}
+
+// Ticker rendern
+function renderTicker(history) {
+  const stats = Object.entries(history).map(([item, h]) => ({
+    item,
+    diff10: parseFloat(percentDiff(h.now, h.at10)),
+    now: h.now
+  }));
+  
+  const tickerText = stats.map(s => 
+    `${s.item}: ${s.now.toFixed(2)} (${s.diff10 > 0 ? '+' : ''}${s.diff10.toFixed(1)}%)`
+  ).join(' • ');
+  
+  document.getElementById('tickerContent').innerHTML = tickerText;
+}
+
+// Charts mit Wellen rendern
 let spikeChart, crashChart;
-function renderCharts(history){
-  const stats=Object.entries(history).map(([item,h])=>({item,...h,diff10:percentDiff(h.now,h.at10)}));
-  stats.sort((a,b)=>b.diff10-a.diff10);
-  const topSpikes=stats.slice(0,5);
-  const topCrashes=stats.slice(-5);
 
-  const spikeDatasets=topSpikes.map(d=>({label:d.item,data:d.history,borderColor:`hsl(${Math.random()*360},100%,60%)`,fill:false,tension:0.3}));
-  const crashDatasets=topCrashes.map(d=>({label:d.item,data:d.history,borderColor:`hsl(${Math.random()*360},100%,60%)`,fill:false,tension:0.3}));
+function renderCharts(history) {
+  const stats = Object.entries(history).map(([item, h]) => ({
+    item,
+    ...h,
+    diff10: parseFloat(percentDiff(h.now, h.at10))
+  }));
+  
+  stats.sort((a, b) => b.diff10 - a.diff10);
+  const topSpikes = stats.slice(0, 5);
+  const topCrashes = [...stats].sort((a, b) => a.diff10 - b.diff10).slice(0, 5);
 
-  const ctxSpike=document.getElementById('spikeChart').getContext('2d');
-  if(spikeChart) spikeChart.destroy();
-  spikeChart=new Chart(ctxSpike,{type:'line',data:{datasets:spikeDatasets},options:{parsing:{xAxisKey:'x',yAxisKey:'y'},animation:{duration:800},scales:{x:{type:'time',time:{unit:'minute'},ticks:{color:'white'}},y:{ticks:{color:'white'}}},plugins:{legend:{labels:{color:'white'}}}}});
+  // Spike Chart (Gewinner)
+  const spikeDatasets = topSpikes.map((d, i) => ({
+    label: d.item,
+    data: d.history,
+    borderColor: `hsl(${i * 50}, 80%, 65%)`,
+    backgroundColor: `hsla(${i * 50}, 80%, 65%, 0.1)`,
+    fill: true,
+    tension: 0.4,
+    pointRadius: 2,
+    borderWidth: 2
+  }));
 
-  const ctxCrash=document.getElementById('crashChart').getContext('2d');
-  if(crashChart) crashChart.destroy();
-  crashChart=new Chart(ctxCrash,{type:'line',data:{datasets:crashDatasets},options:{parsing:{xAxisKey:'x',yAxisKey:'y'},animation:{duration:800},scales:{x:{type:'time',time:{unit:'minute'},ticks:{color:'white'}},y:{ticks:{color:'white'}}},plugins:{legend:{labels:{color:'white'}}}}});
+  // Crash Chart (Verlierer)  
+  const crashDatasets = topCrashes.map((d, i) => ({
+    label: d.item,
+    data: d.history,
+    borderColor: `hsl(${i * 50 + 180}, 80%, 65%)`,
+    backgroundColor: `hsla(${i * 50 + 180}, 80%, 65%, 0.1)`,
+    fill: true,
+    tension: 0.4,
+    pointRadius: 2,
+    borderWidth: 2
+  }));
 
-  document.getElementById('spikeChart').classList.add('visible');
-  document.getElementById('crashChart').classList.add('visible');
+  // Chart-Optionen mit Wellen-Optimierung
+  const chartOptions = {
+    parsing: { xAxisKey: 'x', yAxisKey: 'y' },
+    animation: { duration: 1000, easing: 'easeInOutQuart' },
+    scales: {
+      x: {
+        type: 'time',
+        time: { unit: 'hour', displayFormats: { hour: 'HH:mm' } },
+        grid: { color: 'rgba(255,255,255,0.1)' },
+        ticks: { color: 'rgba(255,255,255,0.7)' }
+      },
+      y: {
+        grid: { color: 'rgba(255,255,255,0.1)' },
+        ticks: { color: 'rgba(255,255,255,0.7)' }
+      }
+    },
+    plugins: {
+      legend: { 
+        labels: { color: 'white', font: { size: 11 } },
+        position: 'top'
+      },
+      tooltip: { mode: 'index', intersect: false }
+    },
+    elements: {
+      line: { borderJoinStyle: 'round' }
+    }
+  };
+
+  // Spike Chart rendern
+  const ctxSpike = document.getElementById('spikeChart').getContext('2d');
+  if (spikeChart) spikeChart.destroy();
+  spikeChart = new Chart(ctxSpike, {
+    type: 'line',
+    data: { datasets: spikeDatasets },
+    options: chartOptions
+  });
+
+  // Crash Chart rendern
+  const ctxCrash = document.getElementById('crashChart').getContext('2d');
+  if (crashChart) crashChart.destroy();
+  crashChart = new Chart(ctxCrash, {
+    type: 'line',
+    data: { datasets: crashDatasets },
+    options: chartOptions
+  });
+
+  document.querySelectorAll('.chart-card').forEach(c => c.classList.add('visible'));
 }
 
 // Scroll Animation
-function animateElements(){
-  document.querySelectorAll('.card').forEach(el=>{if(el.getBoundingClientRect().top<window.innerHeight-50) el.classList.add('visible');});
-  document.querySelectorAll('canvas').forEach(c=>{if(c.getBoundingClientRect().top<window.innerHeight-50) c.classList.add('visible');});
+function animateElements() {
+  document.querySelectorAll('.card, .table-container, .chart-card').forEach(el => {
+    if (el.getBoundingClientRect().top < window.innerHeight - 50) {
+      el.classList.add('visible');
+    }
+  });
 }
+
+// Hintergrund-Animation
+const bgCanvas = document.getElementById('backgroundCanvas');
+const ctx = bgCanvas.getContext('2d');
+bgCanvas.width = window.innerWidth;
+bgCanvas.height = window.innerHeight;
+
+let points = [];
+for (let i = 0; i < 150; i++) {
+  points.push({
+    x: Math.random() * bgCanvas.width,
+    y: Math.random() * bgCanvas.height,
+    r: Math.random() * 3 + 1,
+    speed: Math.random() * 0.3 + 0.1,
+    angle: Math.random() * Math.PI * 2
+  });
+}
+
+function animateBackground() {
+  ctx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+  
+  points.forEach(p => {
+    // Sanfte Bewegung
+    p.x += Math.sin(p.angle) * p.speed;
+    p.y += Math.cos(p.angle) * p.speed;
+    p.angle += 0.01;
+    
+    // Rand-Check
+    if (p.x < 0 || p.x > bgCanvas.width) p.angle += Math.PI;
+    if (p.y < 0 || p.y > bgCanvas.height) p.angle += Math.PI;
+    
+    // Zeichnen
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(100, 200, 255, ${p.r * 0.1})`;
+    ctx.fill();
+  });
+  
+  requestAnimationFrame(animateBackground);
+}
+animateBackground();
+
+window.addEventListener('resize', () => {
+  bgCanvas.width = window.innerWidth;
+  bgCanvas.height = window.innerHeight;
+});
+
 window.addEventListener('scroll', animateElements);
 
-// Hintergrundpunkte
-const canvas=document.getElementById('backgroundCanvas');
-const ctx=canvas.getContext('2d');
-canvas.width=window.innerWidth; canvas.height=window.innerHeight;
-let points=[];
-for(let i=0;i<200;i++){points.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*2+1,speed:Math.random()*0.5+0.2});}
-function animateBackground(){ctx.clearRect(0,0,canvas.width,canvas.height);points.forEach(p=>{p.y+=p.speed;if(p.y>canvas.height)p.y=0;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='white';ctx.fill();});requestAnimationFrame(animateBackground);}
-animateBackground();
-window.addEventListener('resize',()=>{canvas.width=window.innerWidth;canvas.height=window.innerHeight;});
-
-// Fetch jede Minute
+// Initial load
 fetchData();
-setInterval(fetchData,60000);
+
+// Auto-refresh alle 30 Sekunden
+setInterval(fetchData, 30000);
+
 // Reset um Mitternacht
-setInterval(()=>{const now=new Date();if(now.getHours()===0 && now.getMinutes()===0) resetData();},60000);
+setInterval(() => {
+  const now = new Date();
+  if (now.getHours() === 0 && now.getMinutes() === 0) resetData();
+}, 60000);
 </script>
 </body>
 </html>
